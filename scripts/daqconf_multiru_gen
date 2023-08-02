@@ -1,0 +1,807 @@
+#!/usr/bin/env python3
+import click
+import math
+import shutil
+import os.path
+from rich.console import Console
+from os.path import exists, abspath, dirname, basename
+from pathlib import Path
+
+from daqconf.core.console import console
+
+# console.log("daqconf - loading base modules")
+
+from daqconf.core.system import System
+from daqconf.core.metadata import write_metadata_file, write_config_file
+from daqconf.core.sourceid import SourceIDBroker #, get_tpg_mode
+from daqconf.core.config_file import generate_cli_from_schema
+from daqconf.core.assets import resolve_asset_file
+# from detchannelmaps._daq_detchannelmaps_py import HardwareMapService
+from detdataformats import *
+
+import daqconf.detreadoutmap as dromap
+# console.log("daqconf - base modules loaded")
+
+
+# Set moo schema search path
+# from dunedaq.env import get_moo_model_path
+# import moo.io
+# moo.io.default_load_path = get_moo_model_path()
+
+# Load configuration types
+# import moo.otypes
+
+# moo.otypes.load_types('detchannelmaps/hardwaremapservice.jsonnet')
+# import dunedaq.detchannelmaps.hardwaremapservice as hwms
+
+
+def expand_conf(config_data, debug=False):
+    """Expands the moo configuration record into sub-records, 
+    re-casting its members into the corresponding moo objects.
+
+    Args:
+        config_data (_type_): Configuration object
+        debug (bool, optional): Enable verbose reports. Defaults to False.
+
+    Returns:
+        _type_: _description_
+    """
+
+    import dunedaq.daqconf.confgen as confgen
+    import dunedaq.daqconf.bootgen as bootgen
+    import dunedaq.daqconf.detectorgen as detectorgen
+    import dunedaq.daqconf.daqcommongen as daqcommongen
+    import dunedaq.daqconf.timinggen as timinggen
+    import dunedaq.daqconf.hsigen as hsigen
+    import dunedaq.daqconf.readoutgen as readoutgen
+    import dunedaq.daqconf.triggergen as triggergen
+    import dunedaq.daqconf.dataflowgen as dataflowgen
+    import dunedaq.daqconf.dqmgen as dqmgen
+
+    ## Hack, we shouldn't need to do that, in the future it should be, boot = config_data.boot
+    boot = bootgen.boot(**config_data.boot)
+    if debug: console.log(f"boot configuration object: {boot.pod()}")
+
+    detector = detectorgen.detector(**config_data.detector)
+    if debug: console.log(f"detector configuration object: {detector.pod()}")
+
+    daq_common = daqcommongen.daq_common(**config_data.daq_common)
+    if debug: console.log(f"daq_common configuration object: {daq_common.pod()}")
+
+    timing = timinggen.timing(**config_data.timing)
+    if debug: console.log(f"timing configuration object: {timing.pod()}")
+
+    hsi = hsigen.hsi(**config_data.hsi)
+    if debug: console.log(f"hsi configuration object: {hsi.pod()}")
+
+    ctb_hsi = confgen.ctb_hsi(**config_data.ctb_hsi)
+    if debug: console.log(f"ctb_hsi configuration object: {ctb_hsi.pod()}")
+
+    readout = readoutgen.readout(**config_data.readout)
+    if debug: console.log(f"readout configuration object: {readout.pod()}")
+
+    trigger = triggergen.trigger(**config_data.trigger)
+    if debug: console.log(f"trigger configuration object: {trigger.pod()}")
+
+    dataflow = dataflowgen.dataflow(**config_data.dataflow)
+    if debug: console.log(f"dataflow configuration object: {dataflow.pod()}")
+
+    dqm = dqmgen.dqm(**config_data.dqm)
+    if debug: console.log(f"dqm configuration object: {dqm.pod()}")
+
+    # dpdk_sender = confgen.dpdk_sender(**config_data.dpdk_sender)
+    # if debug: console.log(f"dpdk_sender configuration object: {dpdk_sender.pod()}")
+
+    return (
+        boot,
+        detector,
+        daq_common,
+        timing,
+        hsi,
+        ctb_hsi,
+        readout,
+        trigger,
+        dataflow,
+        dqm,
+        # dpdk_sender
+    )
+
+def validate_conf(boot, readout, dataflow, timing, hsi, dqm):
+    """Validate the consistency of confgen parameters
+
+    Args:
+        boot (_type_): _description_
+        readout (_type_): _description_
+        dataflow (_type_): _description_
+        timing (_type_): _description_
+        hsi (_type_): _description_
+        dqm (_type_): _description_
+
+    Raises:
+        Exception: _description_
+        Exception: _description_
+        Exception: _description_
+        Exception: _description_
+        Exception: _description_
+        Exception: _description_
+        Exception: _description_
+    """
+    if readout.enable_tpg and readout.use_fake_data_producers:
+        raise Exception("Fake data producers don't support software tpg")
+
+    if readout.use_fake_data_producers and dqm.enable_dqm:
+        raise Exception("DQM can't be used with fake data producers")
+
+    if dataflow.enable_tpset_writing and not readout.enable_tpg:
+        raise Exception("TP writing can only be used when either software or firmware TPG is enabled")
+
+    if hsi.use_timing_hsi and not hsi.hsi_device_name:
+        raise Exception("If --use-hsi-hw flag is set to true, --hsi-device-name must be specified!")
+
+    if timing.control_timing_partition and not timing.timing_partition_master_device_name:
+        raise Exception("If --control-timing-partition flag is set to true, --timing-partition-master-device-name must be specified!")
+
+    if hsi.control_hsi_hw and not hsi.use_timing_hsi:
+        raise Exception("Timing HSI hardware control can only be enabled if timing HSI hardware is used!")
+
+    if boot.process_manager == 'k8s' and not boot.k8s_image:
+        raise Exception("You need to define k8s_image if running with k8s")
+
+
+def create_df_apps(
+        dataflow,
+        sourceid_broker
+    ):
+
+    import dunedaq.daqconf.dataflowgen as dataflowgen
+
+    if len(dataflow.apps) == 0:
+        console.log(f"No Dataflow apps defined, adding default dataflow0")
+        dataflow.apps = [dataflowgen.dataflowapp()]
+
+    host_df = []
+    appconfig_df = {}
+    df_app_names = []
+    for d in dataflow.apps:
+        console.log(f"Parsing dataflow app config {d}")
+
+        ## Hack, we shouldn't need to do that, in the future, it should be appconfig = d
+        appconfig = dataflowgen.dataflowapp(**d)
+
+        dfapp = appconfig.app_name
+        if dfapp in df_app_names:
+            appconfig_df[dfapp].update(appconfig)
+        else:
+            df_app_names.append(dfapp)
+            appconfig_df[dfapp] = appconfig
+            appconfig_df[dfapp].source_id = sourceid_broker.get_next_source_id("TRBuilder")
+            sourceid_broker.register_source_id("TRBuilder", appconfig_df[dfapp].source_id, None)
+            host_df += [appconfig.host_df]
+    return host_df, appconfig_df, df_app_names
+
+
+# Add -h as default help option
+CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
+@click.command(context_settings=CONTEXT_SETTINGS)
+@generate_cli_from_schema('daqconf/confgen.jsonnet', 'daqconf_multiru_gen', 'daqconf.dataflowgen.dataflowapp')
+@click.option('--force-pm', default=None, type=click.Choice(['ssh', 'k8s']), help="Force process manager")
+@click.option('--base-command-port', type=int, default=None, help="Base port of application command endpoints")
+@click.option('-m', '--detector-readout-map-file', default=None, help="File containing detector detector-readout map for configuration to run")
+@click.option('-s', '--data-rate-slowdown-factor', default=0, help="Scale factor for readout internal clock to generate less data")
+@click.option('--file-label', default=None, help="File - used for raw data filename prefix")
+@click.option('--enable-dqm', default=False, is_flag=True, help="Enable generation of DQM apps")
+@click.option('-a', '--check-args-and-exit', default=False, is_flag=True, help="Check input arguments and quit")
+@click.option('-n', '--dry-run', default=False, is_flag=True, help="Dry run, do not generate output files")
+@click.option('-f', '--force', default=False, is_flag=True, help="Force configuration generation - delete existing target directory if exists")
+@click.option('--debug', default=False, is_flag=True, help="Switch to get a lot of printout and dot files")
+@click.argument('json_dir', type=click.Path())
+def cli(
+        config,
+        force_pm,
+        base_command_port,
+        detector_readout_map_file,
+        data_rate_slowdown_factor,
+        enable_dqm,
+        file_label,
+        check_args_and_exit,
+        dry_run,
+        force,
+        debug,
+        json_dir
+    ):
+
+    # console.log("Commandline parsing completed")
+    if check_args_and_exit:
+        return
+    
+    output_dir = Path(json_dir)
+    if output_dir.exists():
+        if dry_run:
+            pass
+        elif force:
+            console.log(f"Removing existing {output_dir}")
+            # Delete output folder if it exists
+            shutil.rmtree(output_dir)
+        else:
+            raise RuntimeError(f"Directory {output_dir} already exists")
+
+
+    debug_dir = output_dir / 'debug'
+    if debug and not dry_run:
+        debug_dir.mkdir(parents=True)
+
+    config_data = config[0]
+    config_file = Path(config[1] if config[1] is not None else "daqconf_default.json")
+
+    if debug:
+        console.log(f"Configuration for daqconf: {config_data.pod()}")
+
+    (
+        boot,
+        detector,
+        daq_common,
+        timing,
+        hsi,
+        ctb_hsi,
+        readout,
+        trigger,
+        dataflow,
+        dqm,
+        # dpdk_sender
+    ) = expand_conf(config_data, debug)
+
+    #
+    # Update command-line options config parameters
+    #
+    if force_pm is not None:
+        boot.process_manager = force_pm
+        console.log(f"boot.boot.process_manager set to {boot.process_manager}")
+
+    use_k8s = (boot.process_manager == 'k8s')
+
+    if base_command_port is not None:
+        boot.base_command_port = base_command_port
+        console.log(f"boot.base_command_port set to {boot.base_command_port}")
+
+       
+    if detector_readout_map_file is not None:
+        readout.detector_readout_map_file = detector_readout_map_file
+        console.log(f"readout.detector_readout_map_file set to {readout.detector_readout_map_file}")
+
+    if data_rate_slowdown_factor != 0:
+        daq_common.data_rate_slowdown_factor = data_rate_slowdown_factor
+        console.log(f"daq_common.data_rate_slowdown_factor set to {daq_common.data_rate_slowdown_factor}")
+
+    dqm.enable_dqm |= enable_dqm
+
+    if dqm.impl == 'pocket':
+        dqm.kafka_address = boot.pocket_url + ":30092"
+    
+    file_label = file_label if file_label is not None else detector.op_env
+
+    #--------------------------------------------------------------------------
+    # Validate configuration
+    #--------------------------------------------------------------------------
+    validate_conf(boot, readout, dataflow, timing, hsi, dqm)
+
+    console.log("Loading dataflow config generator")
+    from daqconf.apps.dataflow_gen import get_dataflow_app
+    if dqm.enable_dqm:
+        console.log("Loading dqm config generator")
+        from daqconf.apps.dqm_gen import get_dqm_app
+    console.log("Loading readout config generator")
+    from daqconf.apps.readout_gen import create_fake_readout_app, ReadoutAppGenerator
+    console.log("Loading trigger config generator")
+    from daqconf.apps.trigger_gen import get_trigger_app
+    console.log("Loading DFO config generator")
+    from daqconf.apps.dfo_gen import get_dfo_app
+    console.log("Loading timing hsi config generator")
+    from daqconf.apps.hsi_gen import get_timing_hsi_app
+    console.log("Loading fake hsi config generator")
+    from daqconf.apps.fake_hsi_gen import get_fake_hsi_app
+    console.log("Loading ctb config generator")
+    from ctbmodules.apps.ctb_hsi_gen import get_ctb_hsi_app
+    console.log("Loading timing partition controller config generator")
+    from daqconf.apps.tprtc_gen import get_tprtc_app
+    console.log("Loading DPDK sender config generator")
+    # from daqconf.apps.dpdk_sender_gen import get_dpdk_sender_app
+
+    if dataflow.enable_tpset_writing:
+        console.log("Loading TPWriter config generator")
+        from daqconf.apps.tpwriter_gen import get_tpwriter_app
+
+    sourceid_broker = SourceIDBroker()
+    sourceid_broker.debug = debug
+
+    #--------------------------------------------------------------------------
+    # Create dataflow applications
+    #--------------------------------------------------------------------------
+    host_df, appconfig_df, df_app_names = create_df_apps(dataflow=dataflow, sourceid_broker=sourceid_broker)
+
+    # Expand paths/assetfiles
+    readout.default_data_file = resolve_asset_file(readout.default_data_file, debug)
+    data_file_map = {}
+    for entry in readout.data_files:
+        data_file_map[entry["detector_id"]] = resolve_asset_file(entry["data_file"], debug)
+
+    # and output paths (Why does it need to be expanded in k8s mode only? or at all?)
+    if use_k8s:
+        console.log(f'Using k8s')
+        dataflow.tpset_output_path = abspath(dataflow.tpset_output_path)
+        for df_app in appconfig_df.values():
+            new_output_path = []
+            for op in df_app.output_paths:
+                new_output_path += [abspath(op)]
+            df_app.output_paths = new_output_path
+
+    #--------------------------------------------------------------------------
+    # Generation starts here
+    #--------------------------------------------------------------------------
+    console.log(f"Generating configs for hosts trigger={trigger.host_trigger} DFO={dataflow.host_dfo} dataflow={host_df} timing_hsi={hsi.host_timing_hsi} fake_hsi={hsi.host_fake_hsi} ctb_hsi={ctb_hsi.host_ctb_hsi} dqm={dqm.host_dqm}")
+
+    the_system = System()
+
+    # Load the readout map file here to extract ru hosts, cards, slr, links, forntend types, sourceIDs and geoIDs
+    # The ru apps are determined by the combinations of hostname and card_id, the SourceID determines the
+    # DLH (with physical slr+link information), the detId acts as system_type allows to infer the frontend_type
+
+    #--------------------------------------------------------------------------
+    # Load Detector Readout map
+    #--------------------------------------------------------------------------
+    dro_map = dromap.DetReadoutMapService()
+    if readout.detector_readout_map_file:
+        dro_map.load(readout.detector_readout_map_file)
+
+    ru_descs = dro_map.get_ru_descriptors()
+
+    # tp_mode = get_tpg_mode(readout.enable_firmware_tpg,readout.enable_tpg)
+    sourceid_broker.register_readout_source_ids(dro_map.streams)
+    sourceid_broker.generate_trigger_source_ids(ru_descs, readout.enable_tpg)
+    tp_infos = sourceid_broker.get_all_source_ids("Trigger")
+
+    number_of_ru_streams = 0
+    for ru_name, ru_desc in ru_descs.items():
+        console.log(f"Will generate a RU process on {ru_name} ({ru_desc.iface}, {ru_desc.kind}), {len(ru_desc.streams)} streams active")
+        number_of_ru_streams += len(ru_desc.streams)
+
+
+
+
+    max_expected_tr_sequences = 1
+    for df_config in appconfig_df.values():
+        if df_config.max_trigger_record_window >= 1:
+            df_max_sequences = ((trigger.trigger_window_before_ticks + trigger.trigger_window_after_ticks) / df_config.max_trigger_record_window)
+            if df_max_sequences > max_expected_tr_sequences:
+                max_expected_tr_sequences = df_max_sequences
+
+    # 11-Jul-2022, KAB: added timeout calculations. The Readout and Trigger App DataRequest timeouts
+    # are set based on the command-line parameter that is specified in this script, and they are
+    # treated separately here in case we want to customize them somehow in the future.
+    # The trigger-record-building timeout is intended to be a multiple of the larger of those two,
+    # and it needs to have a non-trivial minimum value.
+    # We also include a factor in the TRB timeout that takes into account the number of data producers.
+    # At the moment, that factor uses the square root of the number of data producers, and it attempts
+    # to take into account the number of data producers in Readout and Trigger.
+    MINIMUM_BASIC_TRB_TIMEOUT = 200  # msec
+    TRB_TIMEOUT_SAFETY_FACTOR = 2
+    DFO_TIMEOUT_SAFETY_FACTOR = 2
+    MINIMUM_DFO_TIMEOUT = 10000
+    readout_data_request_timeout = daq_common.data_request_timeout_ms # can that be put somewhere else? in dataflow?
+    trigger_data_request_timeout = daq_common.data_request_timeout_ms
+    trigger_record_building_timeout = max(MINIMUM_BASIC_TRB_TIMEOUT, TRB_TIMEOUT_SAFETY_FACTOR * max(readout_data_request_timeout, trigger_data_request_timeout))
+    if len(ru_descs) >= 1:
+        effective_number_of_data_producers = number_of_ru_streams
+        if readout.enable_tpg:
+            effective_number_of_data_producers *= len(ru_descs)  # add in TPSet producers from Trigger (one per RU)
+            effective_number_of_data_producers += len(ru_descs)  # add in TA producers from Trigger (one per RU)
+        trigger_record_building_timeout = int(math.sqrt(effective_number_of_data_producers) * trigger_record_building_timeout)
+    trigger_record_building_timeout += 15 * TRB_TIMEOUT_SAFETY_FACTOR * max_expected_tr_sequences
+    dfo_stop_timeout = max(DFO_TIMEOUT_SAFETY_FACTOR * trigger_record_building_timeout, MINIMUM_DFO_TIMEOUT)
+
+
+    #--------------------------------------------------------------------------
+    # CTB
+    #--------------------------------------------------------------------------
+    if ctb_hsi.use_ctb_hsi:
+        ctb_llt_source_id = sourceid_broker.get_next_source_id("HW_Signals_Interface")
+        sourceid_broker.register_source_id("HW_Signals_Interface", ctb_llt_source_id, None)
+
+        ctb_hlt_source_id = sourceid_broker.get_next_source_id("HW_Signals_Interface")
+        sourceid_broker.register_source_id("HW_Signals_Interface", ctb_hlt_source_id, None)
+
+        the_system.apps["ctbhsi"] = get_ctb_hsi_app(
+            ctb_hsi,
+            nickname = "ctb",
+            LLT_SOURCE_ID=ctb_llt_source_id,
+            HLT_SOURCE_ID=ctb_hlt_source_id,
+            )
+        if debug: console.log("ctb hsi cmd data:", the_system.apps["ctbhsi"])
+
+    #--------------------------------------------------------------------------
+    # Real HSI
+    #--------------------------------------------------------------------------
+    if hsi.use_timing_hsi:
+        timing_hsi_source_id = sourceid_broker.get_next_source_id("HW_Signals_Interface")
+        sourceid_broker.register_source_id("HW_Signals_Interface", timing_hsi_source_id, None)
+
+        the_system.apps["timinghsi"] = get_timing_hsi_app(
+            hsi = hsi,
+            detector = detector,
+            source_id = timing_hsi_source_id,
+            daq_common = daq_common,
+            timing_session_name = timing.timing_session_name,
+            DEBUG=debug
+            )
+        if debug: console.log("timing hsi cmd data:", the_system.apps["timinghsi"])
+
+    #--------------------------------------------------------------------------
+    # Fake HSI
+    #--------------------------------------------------------------------------
+    if hsi.use_fake_hsi:
+        fake_hsi_source_id = sourceid_broker.get_next_source_id("HW_Signals_Interface")
+        sourceid_broker.register_source_id("HW_Signals_Interface", fake_hsi_source_id, None)
+
+        the_system.apps["fakehsi"] = get_fake_hsi_app(
+            hsi = hsi,
+            detector = detector,
+            daq_common = daq_common,
+            source_id = fake_hsi_source_id,
+            DEBUG=debug)
+        if debug: console.log("fake hsi cmd data:", the_system.apps["fakehsi"])
+
+        # the_system.apps["hsi"] = util.App(modulegraph=mgraph_hsi, host=hsi.host_hsi)
+
+    #--------------------------------------------------------------------------
+    # Timing controller
+    #--------------------------------------------------------------------------
+    if timing.control_timing_partition:
+        the_system.apps["tprtc"] = get_tprtc_app(
+            timing,
+            DEBUG=debug
+    )
+
+    #--------------------------------------------------------------------------
+    # Trigger
+    #--------------------------------------------------------------------------
+    the_system.apps['trigger'] = get_trigger_app(
+        trigger=trigger,
+        detector=detector,
+        daq_common=daq_common,
+        tp_infos=tp_infos,
+        trigger_data_request_timeout=trigger_data_request_timeout,
+        DEBUG=debug)
+
+    #--------------------------------------------------------------------------
+    # DFO
+    #--------------------------------------------------------------------------
+    the_system.apps['dfo'] = get_dfo_app(
+        FREE_COUNT = max(1, dataflow.token_count / 2),
+        BUSY_COUNT = dataflow.token_count,
+        DF_CONF = appconfig_df,
+        STOP_TIMEOUT = dfo_stop_timeout,
+        HOST=dataflow.host_dfo,
+        DEBUG=debug)
+
+
+    trb_dqm_sourceid_offset = sourceid_broker.get_next_source_id("TRBuilder")
+    ru_app_names=[]
+    dqm_app_names = []
+
+    #--------------------------------------------------------------------------
+    # Readout generation
+    #--------------------------------------------------------------------------
+    roapp_gen = ReadoutAppGenerator(readout, detector, daq_common)
+    for ru_i,(ru_name, ru_desc) in enumerate(ru_descs.items()):
+
+        #--------------------------------------------------------------------------
+        # Readout applications
+        #--------------------------------------------------------------------------
+        if readout.use_fake_data_producers == False:
+            the_system.apps[ru_name] = roapp_gen.generate(
+                RU_DESCRIPTOR=ru_desc, 
+                SOURCEID_BROKER=sourceid_broker, 
+                data_file_map=data_file_map,
+                data_timeout_requests=readout_data_request_timeout
+                )
+
+        else:
+            the_system.apps[ru_name] = create_fake_readout_app(
+                RU_DESCRIPTOR = ru_desc,
+                CLOCK_SPEED_HZ = detector.clock_speed_hz,
+            )
+
+
+        if debug:
+            console.log(f"{ru_name} app: {the_system.apps[ru_name]}")
+
+        #--------------------------------------------------------------------------
+        # DQM frontend applications
+        #--------------------------------------------------------------------------
+        if dqm.enable_dqm:
+            dqm_name = "dqm" + ru_name
+            dqm_app_names.append(dqm_name)
+            dqm_links = [ s.src_id for s in ru_desc.streams ]
+
+            # 07-Mar-2023, KAB: I don't know why {ru_name} in this code *doesn't* have an
+            # underscore in it, and the {RUIDX} variable inside get_readout_app *does* have
+            # an underscore, but that idiosyncrasy means that we can't just give the ru_name
+            # to get_dqm_app for it to use when subscribing to TimeSync messages. So, we'll
+            # create a dedicated variable here *with* the underscore.
+            # ru_name_with_underscore = f"ru{host}_{ru_id.iface}"
+
+            the_system.apps[dqm_name] = get_dqm_app(
+                DQM_IMPL=dqm.impl,
+                DATA_RATE_SLOWDOWN_FACTOR=daq_common.data_rate_slowdown_factor,
+                CLOCK_SPEED_HZ=detector.clock_speed_hz,
+                MAX_NUM_FRAMES=dqm.max_num_frames,
+                DQMIDX = ru_i,
+                KAFKA_ADDRESS=dqm.kafka_address,
+                KAFKA_TOPIC=dqm.kafka_topic,
+                CMAP=dqm.cmap,
+                RAW_PARAMS=dqm.raw_params,
+                RMS_PARAMS=dqm.rms_params,
+                STD_PARAMS=dqm.std_params,
+                FOURIER_CHANNEL_PARAMS=dqm.fourier_channel_params,
+                FOURIER_PLANE_PARAMS=dqm.fourier_plane_params,
+                LINKS=dqm_links,
+                RU_APPNAME=ru_name,
+                TRB_DQM_SOURCEID_OFFSET=trb_dqm_sourceid_offset,
+                HOST=dqm.host_dqm[ru_i % len(dqm.host_dqm)],
+                RU_STREAMS=ru_desc.streams,
+                DEBUG=debug
+            )
+
+            if debug: console.log(f"{dqm_name} app: {the_system.apps[dqm_name]}")
+
+
+
+    #--------------------------------------------------------------------------
+    # Dataflow applications generatioo
+    #--------------------------------------------------------------------------
+    dqm_df_app_names = []
+    idx = 0
+
+    for app_name,df_config in appconfig_df.items():
+        dfidx = df_config.source_id
+        the_system.apps[app_name] = get_dataflow_app(
+            df_config = df_config,
+            dataflow = dataflow,
+            detector = detector,
+            HOSTIDX=dfidx,
+            APP_NAME=app_name,
+            FILE_LABEL = file_label,
+            MAX_EXPECTED_TR_SEQUENCES = max_expected_tr_sequences,
+            TRB_TIMEOUT = trigger_record_building_timeout,
+            HAS_DQM=dqm.enable_dqm,
+            SRC_GEO_ID_MAP=dro_map.get_src_geo_map(),
+            DEBUG=debug
+        )
+
+
+        if dqm.enable_dqm:
+            dqm_name = f"dqmdf{dfidx}"
+            dqm_df_app_names.append(dqm_name)
+            dqm_links = [ s.src_id for s in ru_desc.streams ]
+            the_system.apps[dqm_name] = get_dqm_app(
+                DQM_IMPL=dqm.impl,
+                DATA_RATE_SLOWDOWN_FACTOR = daq_common.data_rate_slowdown_factor,
+                CLOCK_SPEED_HZ = detector.clock_speed_hz,
+                MAX_NUM_FRAMES=dqm.max_num_frames,
+                DQMIDX = dfidx,
+                KAFKA_ADDRESS=dqm.kafka_address,
+                KAFKA_TOPIC=dqm.kafka_topic,
+                CMAP=dqm.cmap,
+                RAW_PARAMS=[0, 0],
+                RMS_PARAMS=[0, 0],
+                STD_PARAMS=[0, 0],
+                FOURIER_CHANNEL_PARAMS=[0, 0],
+                FOURIER_PLANE_PARAMS=[0, 0],
+                LINKS=dqm_links,
+                HOST=dqm.host_dqm[idx%len(dqm.host_dqm)],
+                MODE='df',
+                DF_RATE=dqm.df_rate * len(host_df),
+                DF_ALGS=dqm.df_algs,
+                DF_TIME_WINDOW=trigger.trigger_window_before_ticks + trigger.trigger_window_after_ticks,
+                RU_STREAMS=ru_desc.streams, # This is coming from the readout loop
+                DEBUG=debug)
+
+            if debug: console.log(f"{dqm_name} app: {the_system.apps[dqm_name]}")
+        idx += 1
+
+    #--------------------------------------------------------------------------
+    # TPSet Writer applications generation
+    #--------------------------------------------------------------------------
+    if dataflow.enable_tpset_writing:
+        tpw_name=f'tpwriter'
+        dfidx = sourceid_broker.get_next_source_id("TRBuilder")
+        sourceid_broker.register_source_id("TRBuilder", dfidx, None)
+        the_system.apps[tpw_name] = get_tpwriter_app(
+            dataflow=dataflow,
+            detector=detector,
+            daq_common=daq_common,
+            app_name=tpw_name,
+            file_label=file_label,
+            source_id=dfidx,
+            SRC_GEO_ID_MAP=dro_map.get_src_geo_map(),
+            DEBUG=debug
+            )
+
+        if debug: console.log(f"{tpw_name} app: {the_system.apps[tpw_name]}")
+
+
+    # if dpdk_sender.enable_dpdk_sender:
+    #     the_system.apps["dpdk_sender"] = get_dpdk_sender_app(
+    #         HOST=dpdk_sender.host_dpdk_sender[0],
+    #     )
+
+    #--------------------------------------------------------------------------
+    # App generation completed
+    #--------------------------------------------------------------------------
+
+    all_apps_except_ru = []
+    all_apps_except_ru_and_df = []
+
+    for name,app in the_system.apps.items():
+        if app.name=="__app":
+            app.name=name
+
+        if app.name not in ru_app_names:
+            all_apps_except_ru += [app]
+        if app.name not in ru_app_names+df_app_names:
+            all_apps_except_ru_and_df += [name]
+
+        # HACK
+        boot_order = ru_app_names + df_app_names + [app for app in all_apps_except_ru_and_df]
+        if debug:
+            console.log(f'Boot order: {boot_order}')
+
+    #     console.log(f"MDAapp config generated in {json_dir}")
+    from daqconf.core.conf_utils import make_app_command_data
+    from daqconf.core.fragment_producers import  connect_all_fragment_producers, set_mlt_links#, remove_mlt_link
+
+    if debug:
+        the_system.export(debug_dir / "system_no_frag_prod_connection.dot")
+    connect_all_fragment_producers(the_system, verbose=debug)
+
+    # console.log("After connecting fragment producers, trigger mgraph:", the_system.apps['trigger'].modulegraph)
+    # console.log("After connecting fragment producers, the_system.app_connections:", the_system.app_connections)
+
+    set_mlt_links(the_system, "trigger", verbose=debug)
+
+    mlt_links=the_system.apps["trigger"].modulegraph.get_module("mlt").conf.links
+    if debug:
+        console.log(f"After set_mlt_links, mlt_links is {mlt_links}")
+
+
+    mlt_links=the_system.apps["trigger"].modulegraph.get_module("mlt").conf.links
+    if debug:
+        console.log(f"After remove_mlt_links, mlt_links is {mlt_links}")
+    # END HACK
+
+    if debug:
+        the_system.export(debug_dir / "system.dot")
+
+    ####################################################################
+    # Application command data generation
+    ####################################################################
+
+    # Arrange per-app command data into the format used by util.write_json_files()
+    app_command_datas = {
+        name : make_app_command_data(the_system, app,name, verbose=debug, use_k8s=use_k8s, use_connectivity_service=boot.use_connectivity_service, connectivity_service_interval=boot.connectivity_service_interval)
+        for name,app in the_system.apps.items()
+    }
+
+    ##################################################################################
+    # Make boot.json config
+    from daqconf.core.conf_utils import make_system_command_datas, write_json_files
+
+    # HACK: Make sure RUs start after trigger
+    forced_deps = []
+
+    for name in ru_app_names:
+        forced_deps.append(['hsi', ru_name])
+        if dataflow.enable_tpset_writing:
+            forced_deps.append(['tpwriter', ru_name])
+
+    if dqm.enable_dqm:
+
+        for dqm_name in dqm_app_names:
+            forced_deps.append([dqm_name, 'dfo'])
+
+        for dqm_name in dqm_df_app_names:
+            forced_deps.append([dqm_name, 'dfo'])
+
+    forced_deps.append(['trigger','hsi'])
+
+    def control_to_data_network(control_hostname:str) -> str:
+        ## whatever is appropriate here...
+        if 'pd-tbed-sh' in control_hostname:
+            return control_hostname+'-100g'
+        elif 'pc-tbed-tpu' in control_hostname:
+            return control_hostname+'-dc1'
+        elif control_hostname == 'np04-srv-018':
+            return control_hostname+'-100g'
+        elif control_hostname == 'np04-srv-021':
+            return control_hostname+'-100g'
+        elif control_hostname == 'np04-srv-022':
+            return control_hostname+'-100g'
+        else:
+            return control_hostname
+
+    if daq_common.use_data_network:
+        CDN = control_to_data_network
+    else:
+        CDN = None
+
+    system_command_datas = make_system_command_datas(
+        boot,
+        the_system,
+        forced_deps,
+        verbose=debug,
+        control_to_data_network=CDN,
+    )
+
+
+    if readout.thread_pinning_file != "":
+        resolved_thread_pinning_file = Path(os.path.expandvars(readout.thread_pinning_file)).expanduser()
+        if not resolved_thread_pinning_file.is_absolute():
+            resolved_thread_pinning_file = config_file.parent / resolved_thread_pinning_file
+
+        if not resolved_thread_pinning_file.exists():
+            raise RuntimeError(f'Cannot find the file {readout.thread_pinning_file} ({resolved_thread_pinning_file})')
+
+        system_command_datas['boot']['scripts'] = {
+            "thread_pinning": {
+                "cmd": [
+                    "readout-affinity.py --pinfile ${DUNEDAQ_THREAD_PIN_FILE}"
+                ],
+                "env": {
+                    "DUNEDAQ_THREAD_PIN_FILE": resolved_thread_pinning_file.resolve().as_posix(),
+                    "LD_LIBRARY_PATH": "getenv",
+                    "PATH": "getenv"
+                }
+            }
+        }
+
+
+    if not dry_run:
+        import dunedaq.daqconf.confgen as confgen
+
+        write_json_files(app_command_datas, system_command_datas, output_dir, verbose=debug)
+
+        console.log(f"MDAapp config generated in {output_dir}")
+
+        write_metadata_file(output_dir, "daqconf_multiru_gen", config_file.as_posix())
+        write_config_file(
+            output_dir,
+            config_file.name if config_file else "default.json",
+            confgen.daqconf_multiru_gen(  # :facepalm:
+                boot = boot,
+                detector = detector,
+                daq_common = daq_common,
+                dataflow = dataflow,
+                dqm = dqm,
+                hsi = hsi,
+                ctb_hsi = ctb_hsi,
+                readout = readout,
+                timing = timing,
+                trigger = trigger,
+                # dpdk_sender = dpdk_sender,
+            ) # </facepalm>
+        )
+
+        shutil.copyfile(readout.detector_readout_map_file, output_dir/'dromap.json')
+
+        if debug:
+            for name in the_system.apps:
+                the_system.apps[name].export(debug_dir / f"{name}.dot")
+
+if __name__ == '__main__':
+    # console.log("daqconf - started")
+    try:
+        cli(show_default=True, standalone_mode=True)
+    except Exception as e:
+        console.print_exception()
+        raise SystemExit(-1)
+    # console.log("daqconf - finished")
+    

@@ -1,0 +1,96 @@
+/* 4 columns 10 rows */
+Screen {
+    layout: grid;
+    layers: below above;
+    grid-size: 12 12;
+    grid-gutter: 0;
+    height: 100%;
+}
+
+RunSelection {
+    row-span: 4;
+    column-span: 6;
+    height: 100%;
+    content-align: center middle;
+}
+
+RunInfo {
+    row-span: 4;
+    column-span: 6;
+    height: 100%;
+}
+
+#buttonbox {
+    overflow-x: auto;
+}
+
+#conftree {
+    height:90%;
+}
+
+#verticalconf {
+    height: 20;
+}
+
+.runbuttons {
+    align_horizontal: center;
+}
+
+.configs {
+    row-span: 12;
+    column-span: 3;
+    height: 100%;
+}
+
+.shortconfigs {
+    row-span: 8;
+    column-span: 3;
+    height: 100%;
+}
+
+.versions {
+    row-span: 3;
+    column-span: 9;
+    height: 100%;
+    align-vertical: middle;
+}
+.bigdisplay {
+    row-span: 12;
+    column-span: 9;
+    height: 100%;
+    align-horizontal: center;
+}
+
+.display {
+    row-span: 9;
+    column-span: 9;
+    height: 100%;
+    align-horizontal: center;
+}
+
+.smalldisplay {
+    row-span: 8;
+    column-span: 9;
+    height: 100%;
+    align-horizontal: center;
+}
+
+.redcontainer{
+    border: wide red;
+}
+
+.orangecontainer{
+    border: wide orange;
+}
+
+.greencontainer{
+    border: wide green;
+}
+
+.vbuttons {
+    align-vertical: middle;
+    width: 5%;
+    margin: 1;
+}
+
+
