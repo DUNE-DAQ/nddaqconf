@@ -6,19 +6,18 @@ moo.io.default_load_path = get_moo_model_path()
 # Load configuration types
 import moo.otypes
 
-moo.otypes.load_types('flxlibs/felixcardreader.jsonnet')
+# 03-Jul-2023, KAB, ND
 moo.otypes.load_types('readoutlibs/sourceemulatorconfig.jsonnet')
 moo.otypes.load_types('readoutlibs/readoutconfig.jsonnet')
+moo.otypes.load_types('lbrulibs/pacmancardreader.jsonnet')
 moo.otypes.load_types('dfmodules/fakedataprod.jsonnet')
-moo.otypes.load_types("dpdklibs/nicreader.jsonnet")
 
 
 # Import new types
 import dunedaq.readoutlibs.sourceemulatorconfig as sec
-import dunedaq.flxlibs.felixcardreader as flxcr
 import dunedaq.readoutlibs.readoutconfig as rconf
+import dunedaq.lbrulibs.pacmancardreader as pcr
 import dunedaq.dfmodules.fakedataprod as fdp
-import dunedaq.dpdklibs.nicreader as nrc
 
 # from appfwk.utils import acmd, mcmd, mrccmd, mspec
 from os import path
@@ -41,51 +40,19 @@ def compute_data_types(
     det_str = DetID.subdetector_to_string(DetID.Subdetector(stream_entry.geo_id.det_id))
 
 
-    # Far detector types
-    if (det_str in ("HD_TPC","VD_Bottom_TPC") and stream_entry.kind=='flx' ):
-        fe_type = "wib2"
-        queue_frag_type="WIB2Frame"
-        fakedata_frag_type = "WIB"
-        fakedata_time_tick=32
-        fakedata_frame_size=472
-    elif (det_str in ("HD_TPC","VD_Bottom_TPC") and stream_entry.kind=='eth' ):
-        fe_type = "wibeth"
-        queue_frag_type="WIBEthFrame"
-        fakedata_frag_type = "WIBEth"
-        fakedata_time_tick=2048
-        fakedata_frame_size=7200
-    elif det_str in ("HD_PDS", "VD_Cathode_PDS", "VD_Membrane_PDS") and stream_entry.parameters.mode == "var_rate":
-        fe_type = "pds"
-        fakedata_frag_type = "DAPHNE"
-        queue_frag_type = "PDSFrame"
+    # Near detector types
+    if det_str == "NDLAr_TPC":
+        fe_type = "pacman"
+        fakedata_frag_type = "PACMAN"
+        queue_frag_type = "PACMANFrame"
         fakedata_time_tick=None
-        fakedata_frame_size=472
-    elif det_str in ("HD_PDS", "VD_Cathode_PDS", "VD_Membrane_PDS") and  stream_entry.parameters.mode == "fix_rate":
-        fe_type = "pds_stream"
-        fakedata_frag_type = "DAPHNE"
-        queue_frag_type = "PDSStreamFrame"
+        fakedata_frame_size=None       
+    elif det_str == "NDLAr_PDS":
+        fe_type = "mpd"
+        fakedata_frag_type = "MPD"
+        queue_frag_type = "MPDFrame"
         fakedata_time_tick=None
-        fakedata_frame_size=472
-    elif det_str == "VD_Top_TPC":
-        fe_type = "tde"
-        fakedata_frag_type = "TDE_AMC"
-        queue_frag_type = "TDEFrame"
-        fakedata_time_tick=4472*32
-        fakedata_frame_size=8972
-    # 20-Jun-2023, KAB: quick fix to get FD-specific nightly build to run
-    ## Near detector types
-    #elif det_str == "NDLAr_TPC":
-    #    fe_type = "pacman"
-    #    fakedata_frag_type = "PACMAN"
-    #    queue_frag_type = "PACMANFrame"
-    #    fakedata_time_tick=None
-    #    fakedata_frame_size=None       
-    #elif det_str == "NDLAr_PDS":
-    #    fe_type = "mpd"
-    #    fakedata_frag_type = "MPD"
-    #    queue_frag_type = "MPDFrame"
-    #    fakedata_time_tick=None
-    #    fakedata_frame_size=None       
+        fakedata_frame_size=None       
     else:
         raise ValueError(f"No match for {det_str}, {stream_entry.kind}")
 
@@ -177,8 +144,7 @@ class NICReceiverBuilder:
                 nrc.Interface(
                     ip_addr=rx_ip,
                     mac_addr=rx_mac,
-                    expected_sources=srcs,
-                    stats_reporting_cfg=nrc.StatsReporting()
+                    expected_sources=srcs
                 )
             )         
 
@@ -278,7 +244,7 @@ class ReadoutAppGenerator:
 
 
         modules = [DAQModule(name = "fake_source",
-                                plugin = "FDFakeCardReader",
+                                plugin = "NDFakeCardReader",
                                 conf = conf)]
         # queues = [
         #     Queue(
@@ -471,48 +437,48 @@ class ReadoutAppGenerator:
         return modules, queues
     
 
-#    def create_pacman_cardreader(
-#            self,
-#            FRONTEND_TYPE: str,
-#            QUEUE_FRAGMENT_TYPE: str,
-#            RU_DESCRIPTOR # ReadoutUnitDescriptor
-#        ) -> tuple[list, list]:
-#        """
-#        Create a Pacman Cardeader 
-#        """
-#
-#        reader_name = "nd_reader" 
-#        if FRONTEND_TYPE == 'pacman':
-#            reader_name = "pacman_source"
-#
-#        elif FRONTEND_TYPE == 'mpd':
-#            reader_name = "mpd_source"
-#
-#        else:
-#            raise RuntimeError(f"Pacman Cardreader for {FRONTEND_TYPE} not supported")
-#
-#        modules = [DAQModule(
-#                    name=reader_name,
-#                    plugin="PacmanCardReader",
-#                    conf=pcr.Conf(link_confs = [pcr.LinkConfiguration(Source_ID=stream.src_id)
-#                                        for stream in RU_DESCRIPTOR.streams],
-#                        zmq_receiver_timeout = 10000)
-#                )]
-#        
-#        # Queues
-#        queues = [
-#            Queue(
-#                f"{reader_name}.output_{stream.src_id}",
-#                f"datahandler_{stream.src_id}.raw_input", QUEUE_FRAGMENT_TYPE,
-#                f'{FRONTEND_TYPE}_stream_{stream.src_id}', 100000
-#            ) 
-#            for stream in RU_DESCRIPTOR.streams
-#        ]
-#
+    def create_pacman_cardreader(
+            self,
+            #FRONTEND_TYPE: str,
+            #QUEUE_FRAGMENT_TYPE: str,
+            RU_DESCRIPTOR # ReadoutUnitDescriptor
+        ) -> tuple[list, list]:
+        """
+        Create a Pacman Cardeader 
+        """
+
+        FRONTEND_TYPE, _, _, _, _ = compute_data_types(RU_DESCRIPTOR.streams[0])
+        reader_name = "nd_reader" 
+        if FRONTEND_TYPE == 'pacman':
+            reader_name = "pacman_source"
+
+        elif FRONTEND_TYPE == 'mpd':
+            reader_name = "mpd_source"
+
+        else:
+            raise RuntimeError(f"Pacman Cardreader for {FRONTEND_TYPE} not supported")
+
+        modules = [DAQModule(
+                    name=reader_name,
+                    plugin="PacmanCardReader",
+                    conf=pcr.Conf(link_confs = [pcr.LinkConfiguration(Source_ID=stream.src_id)
+                                        for stream in RU_DESCRIPTOR.streams],
+                        zmq_receiver_timeout = 10000)
+                )]
+
+        # Queues
+        queues = []
+        for s in RU_DESCRIPTOR.streams:
+            FRONTEND_TYPE, QUEUE_FRAGMENT_TYPE, _, _, _ = compute_data_types(s)
+            queues.append(
+                Queue(
+                    f"{reader_name}.output_{s.src_id}",
+                    f"datahandler_{s.src_id}.raw_input", QUEUE_FRAGMENT_TYPE,
+                    f'{FRONTEND_TYPE}_stream_{s.src_id}', 100000
+                )
+            )
+
         return modules, queues
-
-
-
 
 
     ###
@@ -548,7 +514,7 @@ class ReadoutAppGenerator:
             geo_id = stream.geo_id
             modules += [DAQModule(
                         name = f"datahandler_{stream.src_id}",
-                        plugin = "FDDataLinkHandler", 
+                        plugin = "NDDataLinkHandler", 
                         conf = rconf.Conf(
                             readoutmodelconf= rconf.ReadoutModelConf(
                                 source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
@@ -664,7 +630,7 @@ class ReadoutAppGenerator:
         # Create the TP link handler
         modules = [
         DAQModule(name = f"tp_datahandler_{tpset_sid}",
-                    plugin = "FDDataLinkHandler",
+                    plugin = "NDDataLinkHandler",
                     conf = rconf.Conf(
                                 readoutmodelconf = rconf.ReadoutModelConf(
                                     source_queue_timeout_ms = QUEUE_POP_WAIT_MS,
@@ -852,15 +818,15 @@ class ReadoutAppGenerator:
                 cr_mods += dpdk_mods
                 cr_queues += dpdk_queues
 
-#            elif RU_DESCRIPTOR.kind == 'eth' and RU_DESCRIPTOR.streams[0].parameters.protocol == "zmq":
-#
-#                pac_mods, pac_queues = self.create_pacman_cardreader(
-#                    FRONTEND_TYPE=FRONTEND_TYPE,
-#                    QUEUE_FRAGMENT_TYPE=QUEUE_FRAGMENT_TYPE,
-#                    RU_DESCRIPTOR=RU_DESCRIPTOR
-#                )
-#                cr_mods += pac_mods
-#                cr_queues += pac_queues
+            elif RU_DESCRIPTOR.kind == 'eth' and RU_DESCRIPTOR.streams[0].parameters.protocol == "zmq":
+
+                pac_mods, pac_queues = self.create_pacman_cardreader(
+                    #FRONTEND_TYPE=FRONTEND_TYPE,
+                    #QUEUE_FRAGMENT_TYPE=QUEUE_FRAGMENT_TYPE,
+                    RU_DESCRIPTOR=RU_DESCRIPTOR
+                )
+                cr_mods += pac_mods
+                cr_queues += pac_queues
 
         modules += cr_mods
         queues += cr_queues
