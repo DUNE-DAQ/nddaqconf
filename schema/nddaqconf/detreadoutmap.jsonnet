@@ -1,4 +1,4 @@
-// This is the configuration schema for daqconf_multiru_gen
+// This is the configuration schema for nddaqconf_multiru_gen
 //
 
 local moo = import "moo.jsonnet";
@@ -6,7 +6,7 @@ local moo = import "moo.jsonnet";
 local s_hdf5rdf = import "hdf5libs/hdf5rawdatafile.jsonnet";
 local hdf5rdf = moo.oschema.hier(s_hdf5rdf).dunedaq.hdf5libs.hdf5rawdatafile;
 
-local s = moo.oschema.schema("dunedaq.daqconf.detreadoutmap");
+local s = moo.oschema.schema("dunedaq.nddaqconf.detreadoutmap");
 local nc = moo.oschema.numeric_constraints;
 
 // A temporary schema construction context.

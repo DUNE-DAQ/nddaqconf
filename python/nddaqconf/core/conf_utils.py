@@ -25,7 +25,7 @@ import dunedaq.appfwk.app as appfwk  # AddressedCmd,
 import dunedaq.rcif.cmd as rccmd  # AddressedCmd,
 import dunedaq.iomanager.connection as conn
 
-from daqconf.core.daqmodule import DAQModule
+from nddaqconf.core.daqmodule import DAQModule
 
 from .console import console
 

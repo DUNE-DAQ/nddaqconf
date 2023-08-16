@@ -13,10 +13,10 @@ from dunedaq.env import get_moo_model_path
 import moo.io
 moo.io.default_load_path = get_moo_model_path()
 
-moo.otypes.load_types('daqconf/detreadoutmap.jsonnet')
+moo.otypes.load_types('nddaqconf/detreadoutmap.jsonnet')
 moo.otypes.load_types('hdf5libs/hdf5rawdatafile.jsonnet')
 
-import dunedaq.daqconf.detreadoutmap as dromap
+import dunedaq.nddaqconf.detreadoutmap as dromap
 import dunedaq.hdf5libs.hdf5rawdatafile as hdf5rdf
 
 import collections

@@ -35,9 +35,9 @@ import dunedaq.readoutlibs.readoutconfig as rconf
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
     
-from daqconf.core.daqmodule import DAQModule
-from daqconf.core.app import ModuleGraph, App
-from daqconf.core.conf_utils import Direction, Queue
+from nddaqconf.core.daqmodule import DAQModule
+from nddaqconf.core.app import ModuleGraph, App
+from nddaqconf.core.conf_utils import Direction, Queue
         
 import math
 

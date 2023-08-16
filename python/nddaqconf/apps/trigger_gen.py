@@ -29,10 +29,10 @@ import dunedaq.trigger.txbufferconfig as bufferconf
 import dunedaq.readoutlibs.readoutconfig as readoutconf
 import dunedaq.trigger.tpchannelfilter as chfilter
 
-from daqconf.core.app import App, ModuleGraph
-from daqconf.core.daqmodule import DAQModule
-from daqconf.core.conf_utils import Direction, Queue
-from daqconf.core.sourceid import TAInfo, TPInfo, TCInfo
+from nddaqconf.core.app import App, ModuleGraph
+from nddaqconf.core.daqmodule import DAQModule
+from nddaqconf.core.conf_utils import Direction, Queue
+from nddaqconf.core.sourceid import TAInfo, TPInfo, TCInfo
 
 from trgdataformats import TriggerBits as trgbs
 

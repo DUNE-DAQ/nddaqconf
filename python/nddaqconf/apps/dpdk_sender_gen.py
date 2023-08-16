@@ -12,9 +12,9 @@ moo.otypes.load_types("dpdklibs/nicsender.jsonnet")
 # Import new types
 import dunedaq.dpdklibs.nicsender as nsc
 
-from daqconf.core.app import App, ModuleGraph
-from daqconf.core.daqmodule import DAQModule
-from daqconf.core.conf_utils import Endpoint, Direction, Queue
+from nddaqconf.core.app import App, ModuleGraph
+from nddaqconf.core.daqmodule import DAQModule
+from nddaqconf.core.conf_utils import Endpoint, Direction, Queue
 
 # Time to waait on pop()
 QUEUE_POP_WAIT_MS = 100

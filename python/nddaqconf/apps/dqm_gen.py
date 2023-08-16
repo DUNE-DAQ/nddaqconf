@@ -21,9 +21,9 @@ import dunedaq.dqm.dqmprocessor as dqmprocessor
 
 from appfwk.utils import acmd, mcmd, mrccmd, mspec
 
-from daqconf.core.conf_utils import Direction
-from daqconf.core.daqmodule import DAQModule
-from daqconf.core.app import App,ModuleGraph
+from nddaqconf.core.conf_utils import Direction
+from nddaqconf.core.daqmodule import DAQModule
+from nddaqconf.core.app import App,ModuleGraph
 
 from detdataformats import *
 

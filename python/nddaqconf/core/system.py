@@ -1,4 +1,4 @@
-from daqconf.core.conf_utils import Direction
+from nddaqconf.core.conf_utils import Direction
 import networkx as nx
 
 class System:

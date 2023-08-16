@@ -9,7 +9,7 @@ _nanorc_ should then be started with `nanorc --pm k8s://np04-srv-015:31000 db://
 Keep in mind that the config directory can contain underscores, but the name it will be given in the database cannot (hyphens are fine).
 
 ## Viewing configurations
-To inspect the contents of the database, run `daqconf_viewer` after setting up the software environment. This will open a graphical UI in the terminal. There are five optional arguments that can be provided:
+To inspect the contents of the database, run `nddaqconf_viewer` after setting up the software environment. This will open a graphical UI in the terminal. There are five optional arguments that can be provided:
 * --conf-host and reg-host to manually enter the host of the microservices (defaults to http://np04-srv-023 and http://dunedaq-microservices.cern.ch)
 * --conf-port and reg-port to manually enter the port that the service listens on (defaults to 31011 and 5005)
 * --dir to tell the config viewer where to look for local config files (defaults to ./)
