@@ -11,16 +11,16 @@ from daqconf.core.console import console
 
 # console.log("daqconf - loading base modules")
 
-from daqconf.core.system import System
-from daqconf.core.metadata import write_metadata_file, write_config_file
-from daqconf.core.sourceid import SourceIDBroker #, get_tpg_mode
-from daqconf.core.config_file import generate_cli_from_schema
-from daqconf.core.assets import resolve_asset_file
+from nddaqconf.core.system import System
+from nddaqconf.core.metadata import write_metadata_file, write_config_file
+from nddaqconf.core.sourceid import SourceIDBroker #, get_tpg_mode
+from nddaqconf.core.config_file import generate_cli_from_schema
+from nddaqconf.core.assets import resolve_asset_file
 # from detchannelmaps._daq_detchannelmaps_py import HardwareMapService
 from detdataformats import *
 
-import daqconf.detreadoutmap as dromap
-# console.log("daqconf - base modules loaded")
+import nddaqconf.detreadoutmap as dromap
+# console.log("nddaqconf - base modules loaded")
 
 
 # Set moo schema search path
@@ -47,16 +47,16 @@ def expand_conf(config_data, debug=False):
         _type_: _description_
     """
 
-    import dunedaq.daqconf.confgen as confgen
-    import dunedaq.daqconf.bootgen as bootgen
-    import dunedaq.daqconf.detectorgen as detectorgen
-    import dunedaq.daqconf.daqcommongen as daqcommongen
-    import dunedaq.daqconf.timinggen as timinggen
-    import dunedaq.daqconf.hsigen as hsigen
-    import dunedaq.daqconf.readoutgen as readoutgen
-    import dunedaq.daqconf.triggergen as triggergen
-    import dunedaq.daqconf.dataflowgen as dataflowgen
-    import dunedaq.daqconf.dqmgen as dqmgen
+    import dunedaq.nddaqconf.confgen as confgen
+    import dunedaq.nddaqconf.bootgen as bootgen
+    import dunedaq.nddaqconf.detectorgen as detectorgen
+    import dunedaq.nddaqconf.daqcommongen as daqcommongen
+    import dunedaq.nddaqconf.timinggen as timinggen
+    import dunedaq.nddaqconf.hsigen as hsigen
+    import dunedaq.nddaqconf.readoutgen as readoutgen
+    import dunedaq.nddaqconf.triggergen as triggergen
+    import dunedaq.nddaqconf.dataflowgen as dataflowgen
+    import dunedaq.nddaqconf.dqmgen as dqmgen
 
     ## Hack, we shouldn't need to do that, in the future it should be, boot = config_data.boot
     boot = bootgen.boot(**config_data.boot)
@@ -153,7 +153,7 @@ def create_df_apps(
         sourceid_broker
     ):
 
-    import dunedaq.daqconf.dataflowgen as dataflowgen
+    import dunedaq.nddaqconf.dataflowgen as dataflowgen
 
     if len(dataflow.apps) == 0:
         console.log(f"No Dataflow apps defined, adding default dataflow0")
@@ -183,7 +183,7 @@ def create_df_apps(
 # Add -h as default help option
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.command(context_settings=CONTEXT_SETTINGS)
-@generate_cli_from_schema('daqconf/confgen.jsonnet', 'daqconf_multiru_gen', 'daqconf.dataflowgen.dataflowapp')
+@generate_cli_from_schema('nddaqconf/confgen.jsonnet', 'nddaqconf_multiru_gen', 'nddaqconf.dataflowgen.dataflowapp')
 @click.option('--force-pm', default=None, type=click.Choice(['ssh', 'k8s']), help="Force process manager")
 @click.option('--base-command-port', type=int, default=None, help="Base port of application command endpoints")
 @click.option('-m', '--detector-readout-map-file', default=None, help="File containing detector detector-readout map for configuration to run")
@@ -231,10 +231,10 @@ def cli(
         debug_dir.mkdir(parents=True)
 
     config_data = config[0]
-    config_file = Path(config[1] if config[1] is not None else "daqconf_default.json")
+    config_file = Path(config[1] if config[1] is not None else "nddaqconf_default.json")
 
     if debug:
-        console.log(f"Configuration for daqconf: {config_data.pod()}")
+        console.log(f"Configuration for nddaqconf: {config_data.pod()}")
 
     (
         boot,
@@ -285,30 +285,30 @@ def cli(
     validate_conf(boot, readout, dataflow, timing, hsi, dqm)
 
     console.log("Loading dataflow config generator")
-    from daqconf.apps.dataflow_gen import get_dataflow_app
+    from nddaqconf.apps.dataflow_gen import get_dataflow_app
     if dqm.enable_dqm:
         console.log("Loading dqm config generator")
-        from daqconf.apps.dqm_gen import get_dqm_app
+        from nddaqconf.apps.dqm_gen import get_dqm_app
     console.log("Loading readout config generator")
-    from daqconf.apps.readout_gen import create_fake_readout_app, ReadoutAppGenerator
+    from nddaqconf.apps.readout_gen import create_fake_readout_app, ReadoutAppGenerator
     console.log("Loading trigger config generator")
-    from daqconf.apps.trigger_gen import get_trigger_app
+    from nddaqconf.apps.trigger_gen import get_trigger_app
     console.log("Loading DFO config generator")
-    from daqconf.apps.dfo_gen import get_dfo_app
+    from nddaqconf.apps.dfo_gen import get_dfo_app
     console.log("Loading timing hsi config generator")
-    from daqconf.apps.hsi_gen import get_timing_hsi_app
+    from nddaqconf.apps.hsi_gen import get_timing_hsi_app
     console.log("Loading fake hsi config generator")
-    from daqconf.apps.fake_hsi_gen import get_fake_hsi_app
+    from nddaqconf.apps.fake_hsi_gen import get_fake_hsi_app
     console.log("Loading ctb config generator")
     from ctbmodules.apps.ctb_hsi_gen import get_ctb_hsi_app
     console.log("Loading timing partition controller config generator")
-    from daqconf.apps.tprtc_gen import get_tprtc_app
+    from nddaqconf.apps.tprtc_gen import get_tprtc_app
     console.log("Loading DPDK sender config generator")
-    # from daqconf.apps.dpdk_sender_gen import get_dpdk_sender_app
+    # from nddaqconf.apps.dpdk_sender_gen import get_dpdk_sender_app
 
     if dataflow.enable_tpset_writing:
         console.log("Loading TPWriter config generator")
-        from daqconf.apps.tpwriter_gen import get_tpwriter_app
+        from nddaqconf.apps.tpwriter_gen import get_tpwriter_app
 
     sourceid_broker = SourceIDBroker()
     sourceid_broker.debug = debug
@@ -656,8 +656,8 @@ def cli(
             console.log(f'Boot order: {boot_order}')
 
     #     console.log(f"MDAapp config generated in {json_dir}")
-    from daqconf.core.conf_utils import make_app_command_data
-    from daqconf.core.fragment_producers import  connect_all_fragment_producers, set_mlt_links#, remove_mlt_link
+    from nddaqconf.core.conf_utils import make_app_command_data
+    from nddaqconf.core.fragment_producers import  connect_all_fragment_producers, set_mlt_links#, remove_mlt_link
 
     if debug:
         the_system.export(debug_dir / "system_no_frag_prod_connection.dot")
@@ -693,7 +693,7 @@ def cli(
 
     ##################################################################################
     # Make boot.json config
-    from daqconf.core.conf_utils import make_system_command_datas, write_json_files
+    from nddaqconf.core.conf_utils import make_system_command_datas, write_json_files
 
     # HACK: Make sure RUs start after trigger
     forced_deps = []
@@ -765,17 +765,17 @@ def cli(
 
 
     if not dry_run:
-        import dunedaq.daqconf.confgen as confgen
+        import dunedaq.nddaqconf.confgen as confgen
 
         write_json_files(app_command_datas, system_command_datas, output_dir, verbose=debug)
 
         console.log(f"MDAapp config generated in {output_dir}")
 
-        write_metadata_file(output_dir, "daqconf_multiru_gen", config_file.as_posix())
+        write_metadata_file(output_dir, "nddaqconf_multiru_gen", config_file.as_posix())
         write_config_file(
             output_dir,
             config_file.name if config_file else "default.json",
-            confgen.daqconf_multiru_gen(  # :facepalm:
+            confgen.nddaqconf_multiru_gen(  # :facepalm:
                 boot = boot,
                 detector = detector,
                 daq_common = daq_common,
@@ -797,11 +797,11 @@ def cli(
                 the_system.apps[name].export(debug_dir / f"{name}.dot")
 
 if __name__ == '__main__':
-    # console.log("daqconf - started")
+    # console.log("nddaqconf - started")
     try:
         cli(show_default=True, standalone_mode=True)
     except Exception as e:
         console.print_exception()
         raise SystemExit(-1)
-    # console.log("daqconf - finished")
+    # console.log("nddaqconf - finished")
     

@@ -719,7 +719,7 @@ class RunRegistryScreen(Screen):
         pass
 
 class ConfViewer(App):
-    CSS_PATH = "daqconf_viewer.css"
+    CSS_PATH = "nddaqconf_viewer.css"
     BINDINGS = [("q", "quit", "Quit")]
 
     def __init__(self, chost, cport, rhost, rport, dir, **kwargs):
