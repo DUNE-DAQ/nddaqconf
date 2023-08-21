@@ -7,8 +7,9 @@ local moo = import "moo.jsonnet";
 local stypes = import "nddaqconf/types.jsonnet";
 local types = moo.oschema.hier(stypes).dunedaq.nddaqconf.types;
 
-local sctb = import "ctbmodules/ctbmodule.jsonnet";
-local ctbmodule = moo.oschema.hier(sctb).dunedaq.ctbmodules.ctbmodule;
+// 03-Jul-2023, KAB, ND
+//local sctb = import "ctbmodules/ctbmodule.jsonnet";
+//local ctbmodule = moo.oschema.hier(sctb).dunedaq.ctbmodules.ctbmodule;
 
 local sboot = import "nddaqconf/bootgen.jsonnet";
 local bootgen = moo.oschema.hier(sboot).dunedaq.nddaqconf.bootgen;
@@ -70,17 +71,18 @@ local cs = {
   // rte_choice:      s.enum(     "RTEChoice", ["auto", "release", "devarea"], doc="Kubernetes DAQ application RTE choice"),
   
 
-  ctb_hsi: s.record("ctb_hsi", [
-    # ctb options
-    s.field( "use_ctb_hsi", types.flag, default=false, doc='Flag to control whether CTB HSI config is generated. Default is false'),
-    s.field( "host_ctb_hsi", types.host, default='localhost', doc='Host to run the HSI app on'),
-    s.field( "hlt_triggers", ctbmodule.Hlt_trigger_seq, []),
-    s.field( "beam_llt_triggers", ctbmodule.Llt_mask_trigger_seq, []),
-    s.field( "crt_llt_triggers", ctbmodule.Llt_count_trigger_seq, []),
-    s.field( "pds_llt_triggers", ctbmodule.Llt_count_trigger_seq, []),
-    s.field( "fake_trig_1", ctbmodule.Randomtrigger, ctbmodule.Randomtrigger),
-    s.field( "fake_trig_2", ctbmodule.Randomtrigger, ctbmodule.Randomtrigger)
-  ]),
+  // 03-Jul-2023, KAB, ND
+  //ctb_hsi: s.record("ctb_hsi", [
+  //  # ctb options
+  //  s.field( "use_ctb_hsi", types.flag, default=false, doc='Flag to control whether CTB HSI config is generated. Default is false'),
+  //  s.field( "host_ctb_hsi", types.host, default='localhost', doc='Host to run the HSI app on'),
+  //  s.field( "hlt_triggers", ctbmodule.Hlt_trigger_seq, []),
+  //  s.field( "beam_llt_triggers", ctbmodule.Llt_mask_trigger_seq, []),
+  //  s.field( "crt_llt_triggers", ctbmodule.Llt_count_trigger_seq, []),
+  //  s.field( "pds_llt_triggers", ctbmodule.Llt_count_trigger_seq, []),
+  //  s.field( "fake_trig_1", ctbmodule.Randomtrigger, ctbmodule.Randomtrigger),
+  //  s.field( "fake_trig_2", ctbmodule.Randomtrigger, ctbmodule.Randomtrigger)
+  //]),
 
 
   nddaqconf_multiru_gen: s.record('nddaqconf_multiru_gen', [
@@ -90,7 +92,8 @@ local cs = {
     s.field('dataflow',    dataflowgen.dataflow,   default=dataflowgen.dataflow,     doc='Dataflow paramaters'),
     s.field('dqm',         dqmgen.dqm,        default=dqmgen.dqm,          doc='DQM parameters'),
     s.field('hsi',         hsigen.hsi,        default=hsigen.hsi,          doc='HSI parameters'),
-    s.field('ctb_hsi',     self.ctb_hsi,    default=self.ctb_hsi,      doc='CTB parameters'),
+    // 03-Jul-2023, KAB, ND
+    //s.field('ctb_hsi',     self.ctb_hsi,    default=self.ctb_hsi,      doc='CTB parameters'),
     s.field('readout',     readoutgen.readout,    default=readoutgen.readout,      doc='Readout parameters'),
     s.field('timing',      timinggen.timing,     default=timinggen.timing,       doc='Timing parameters'),
     s.field('trigger',     triggergen.trigger,    default=triggergen.trigger,      doc='Trigger parameters')
@@ -100,4 +103,6 @@ local cs = {
 };
 
 // Output a topologically sorted array.
-stypes + sboot + sdetector + sdaqcommon + stiming + shsi + sreadout + strigger + sdataflow + sdqm + sctb + moo.oschema.sort_select(cs)
+// 03-Jul-2023, KAB, ND
+//stypes + sboot + sdetector + sdaqcommon + stiming + shsi + sreadout + strigger + sdataflow + sdqm + sctb + moo.oschema.sort_select(cs)
+stypes + sboot + sdetector + sdaqcommon + stiming + shsi + sreadout + strigger + sdataflow + sdqm + moo.oschema.sort_select(cs)

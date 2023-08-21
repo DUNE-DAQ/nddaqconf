@@ -7,17 +7,24 @@ moo.io.default_load_path = get_moo_model_path()
 import moo.otypes
 
 # 03-Jul-2023, KAB, ND
+#moo.otypes.load_types('flxlibs/felixcardreader.jsonnet')
 moo.otypes.load_types('readoutlibs/sourceemulatorconfig.jsonnet')
 moo.otypes.load_types('readoutlibs/readoutconfig.jsonnet')
 moo.otypes.load_types('lbrulibs/pacmancardreader.jsonnet')
 moo.otypes.load_types('dfmodules/fakedataprod.jsonnet')
+# 03-Jul-2023, KAB, ND
+#moo.otypes.load_types("dpdklibs/nicreader.jsonnet")
 
 
 # Import new types
 import dunedaq.readoutlibs.sourceemulatorconfig as sec
+# 03-Jul-2023, KAB, ND
+#import dunedaq.flxlibs.felixcardreader as flxcr
 import dunedaq.readoutlibs.readoutconfig as rconf
 import dunedaq.lbrulibs.pacmancardreader as pcr
 import dunedaq.dfmodules.fakedataprod as fdp
+# 03-Jul-2023, KAB, ND
+#import dunedaq.dpdklibs.nicreader as nrc
 
 # from appfwk.utils import acmd, mcmd, mrccmd, mspec
 from os import path
@@ -40,8 +47,39 @@ def compute_data_types(
     det_str = DetID.subdetector_to_string(DetID.Subdetector(stream_entry.geo_id.det_id))
 
 
+    # Far detector types
+    if (det_str in ("HD_TPC","VD_Bottom_TPC") and stream_entry.kind=='flx' ):
+        fe_type = "wib2"
+        queue_frag_type="WIB2Frame"
+        fakedata_frag_type = "WIB"
+        fakedata_time_tick=32
+        fakedata_frame_size=472
+    elif (det_str in ("HD_TPC","VD_Bottom_TPC") and stream_entry.kind=='eth' ):
+        fe_type = "wibeth"
+        queue_frag_type="WIBEthFrame"
+        fakedata_frag_type = "WIBEth"
+        fakedata_time_tick=2048
+        fakedata_frame_size=7200
+    elif det_str in ("HD_PDS", "VD_Cathode_PDS", "VD_Membrane_PDS") and stream_entry.parameters.mode == "var_rate":
+        fe_type = "pds"
+        fakedata_frag_type = "DAPHNE"
+        queue_frag_type = "PDSFrame"
+        fakedata_time_tick=None
+        fakedata_frame_size=472
+    elif det_str in ("HD_PDS", "VD_Cathode_PDS", "VD_Membrane_PDS") and  stream_entry.parameters.mode == "fix_rate":
+        fe_type = "pds_stream"
+        fakedata_frag_type = "DAPHNE"
+        queue_frag_type = "PDSStreamFrame"
+        fakedata_time_tick=None
+        fakedata_frame_size=472
+    elif det_str == "VD_Top_TPC":
+        fe_type = "tde"
+        fakedata_frag_type = "TDE_AMC"
+        queue_frag_type = "TDEFrame"
+        fakedata_time_tick=4472*32
+        fakedata_frame_size=8972
     # Near detector types
-    if det_str == "NDLAr_TPC":
+    elif det_str == "NDLAr_TPC":
         fe_type = "pacman"
         fakedata_frag_type = "PACMAN"
         queue_frag_type = "PACMANFrame"

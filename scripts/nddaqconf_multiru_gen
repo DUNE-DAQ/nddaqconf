@@ -9,6 +9,8 @@ from pathlib import Path
 
 from nddaqconf.core.console import console
 
+# console.log("nddaqconf - loading base modules")
+
 from nddaqconf.core.system import System
 from nddaqconf.core.metadata import write_metadata_file, write_config_file
 from nddaqconf.core.sourceid import SourceIDBroker #, get_tpg_mode
@@ -72,8 +74,9 @@ def expand_conf(config_data, debug=False):
     hsi = hsigen.hsi(**config_data.hsi)
     if debug: console.log(f"hsi configuration object: {hsi.pod()}")
 
-    ctb_hsi = confgen.ctb_hsi(**config_data.ctb_hsi)
-    if debug: console.log(f"ctb_hsi configuration object: {ctb_hsi.pod()}")
+    # 03-Jul-2023, KAB, ND
+    #ctb_hsi = confgen.ctb_hsi(**config_data.ctb_hsi)
+    #if debug: console.log(f"ctb_hsi configuration object: {ctb_hsi.pod()}")
 
     readout = readoutgen.readout(**config_data.readout)
     if debug: console.log(f"readout configuration object: {readout.pod()}")
@@ -96,7 +99,8 @@ def expand_conf(config_data, debug=False):
         daq_common,
         timing,
         hsi,
-        ctb_hsi,
+        # 03-Jul-2023, KAB, ND
+        #ctb_hsi,
         readout,
         trigger,
         dataflow,
@@ -240,7 +244,8 @@ def cli(
         daq_common,
         timing,
         hsi,
-        ctb_hsi,
+        # 03-Jul-2023, KAB, ND
+        #ctb_hsi,
         readout,
         trigger,
         dataflow,
@@ -297,8 +302,9 @@ def cli(
     from nddaqconf.apps.hsi_gen import get_timing_hsi_app
     console.log("Loading fake hsi config generator")
     from nddaqconf.apps.fake_hsi_gen import get_fake_hsi_app
-    console.log("Loading ctb config generator")
-    from ctbmodules.apps.ctb_hsi_gen import get_ctb_hsi_app
+    # 03-Jul-2023, KAB, ND
+    #console.log("Loading ctb config generator")
+    #from ctbmodules.apps.ctb_hsi_gen import get_ctb_hsi_app
     console.log("Loading timing partition controller config generator")
     from nddaqconf.apps.tprtc_gen import get_tprtc_app
     console.log("Loading DPDK sender config generator")
@@ -335,7 +341,9 @@ def cli(
     #--------------------------------------------------------------------------
     # Generation starts here
     #--------------------------------------------------------------------------
-    console.log(f"Generating configs for hosts trigger={trigger.host_trigger} DFO={dataflow.host_dfo} dataflow={host_df} timing_hsi={hsi.host_timing_hsi} fake_hsi={hsi.host_fake_hsi} ctb_hsi={ctb_hsi.host_ctb_hsi} dqm={dqm.host_dqm}")
+    # 03-Jul-2023, KAB, ND
+    #console.log(f"Generating configs for hosts trigger={trigger.host_trigger} DFO={dataflow.host_dfo} dataflow={host_df} timing_hsi={hsi.host_timing_hsi} fake_hsi={hsi.host_fake_hsi} ctb_hsi={ctb_hsi.host_ctb_hsi} dqm={dqm.host_dqm}")
+    console.log(f"Generating configs for hosts trigger={trigger.host_trigger} DFO={dataflow.host_dfo} dataflow={host_df} timing_hsi={hsi.host_timing_hsi} fake_hsi={hsi.host_fake_hsi} dqm={dqm.host_dqm}")
 
     the_system = System()
 
@@ -400,20 +408,21 @@ def cli(
     #--------------------------------------------------------------------------
     # CTB
     #--------------------------------------------------------------------------
-    if ctb_hsi.use_ctb_hsi:
-        ctb_llt_source_id = sourceid_broker.get_next_source_id("HW_Signals_Interface")
-        sourceid_broker.register_source_id("HW_Signals_Interface", ctb_llt_source_id, None)
+    # 03-Jul-2023, KAB, ND
+    #if ctb_hsi.use_ctb_hsi:
+    #    ctb_llt_source_id = sourceid_broker.get_next_source_id("HW_Signals_Interface")
+    #    sourceid_broker.register_source_id("HW_Signals_Interface", ctb_llt_source_id, None)
 
-        ctb_hlt_source_id = sourceid_broker.get_next_source_id("HW_Signals_Interface")
-        sourceid_broker.register_source_id("HW_Signals_Interface", ctb_hlt_source_id, None)
+    #    ctb_hlt_source_id = sourceid_broker.get_next_source_id("HW_Signals_Interface")
+    #    sourceid_broker.register_source_id("HW_Signals_Interface", ctb_hlt_source_id, None)
 
-        the_system.apps["ctbhsi"] = get_ctb_hsi_app(
-            ctb_hsi,
-            nickname = "ctb",
-            LLT_SOURCE_ID=ctb_llt_source_id,
-            HLT_SOURCE_ID=ctb_hlt_source_id,
-            )
-        if debug: console.log("ctb hsi cmd data:", the_system.apps["ctbhsi"])
+    #    the_system.apps["ctbhsi"] = get_ctb_hsi_app(
+    #        ctb_hsi,
+    #        nickname = "ctb",
+    #        LLT_SOURCE_ID=ctb_llt_source_id,
+    #        HLT_SOURCE_ID=ctb_hlt_source_id,
+    #        )
+    #    if debug: console.log("ctb hsi cmd data:", the_system.apps["ctbhsi"])
 
     #--------------------------------------------------------------------------
     # Real HSI
@@ -780,7 +789,8 @@ def cli(
                 dataflow = dataflow,
                 dqm = dqm,
                 hsi = hsi,
-                ctb_hsi = ctb_hsi,
+                # 03-Jul-2023, KAB, ND
+                #ctb_hsi = ctb_hsi,
                 readout = readout,
                 timing = timing,
                 trigger = trigger,
