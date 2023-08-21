@@ -7,9 +7,7 @@ from rich.console import Console
 from os.path import exists, abspath, dirname, basename
 from pathlib import Path
 
-from daqconf.core.console import console
-
-# console.log("daqconf - loading base modules")
+from nddaqconf.core.console import console
 
 from nddaqconf.core.system import System
 from nddaqconf.core.metadata import write_metadata_file, write_config_file

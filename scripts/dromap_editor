@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import daqconf.detreadoutmap as dromap
+import nddaqconf.detreadoutmap as dromap
 import detdataformats 
 
 
