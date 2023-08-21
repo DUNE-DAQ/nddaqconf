@@ -6,27 +6,17 @@ moo.io.default_load_path = get_moo_model_path()
 # Load configuration types
 import moo.otypes
 
-# 03-Jul-2023, KAB, ND
-#moo.otypes.load_types('flxlibs/felixcardreader.jsonnet')
 moo.otypes.load_types('readoutlibs/sourceemulatorconfig.jsonnet')
 moo.otypes.load_types('readoutlibs/readoutconfig.jsonnet')
 moo.otypes.load_types('lbrulibs/pacmancardreader.jsonnet')
 moo.otypes.load_types('dfmodules/fakedataprod.jsonnet')
-# 03-Jul-2023, KAB, ND
-#moo.otypes.load_types("dpdklibs/nicreader.jsonnet")
-
 
 # Import new types
 import dunedaq.readoutlibs.sourceemulatorconfig as sec
-# 03-Jul-2023, KAB, ND
-#import dunedaq.flxlibs.felixcardreader as flxcr
 import dunedaq.readoutlibs.readoutconfig as rconf
 import dunedaq.lbrulibs.pacmancardreader as pcr
 import dunedaq.dfmodules.fakedataprod as fdp
-# 03-Jul-2023, KAB, ND
-#import dunedaq.dpdklibs.nicreader as nrc
 
-# from appfwk.utils import acmd, mcmd, mrccmd, mspec
 from os import path
 from pathlib import Path
 
@@ -36,7 +26,6 @@ from ..core.daqmodule import DAQModule
 from ..core.app import App, ModuleGraph
 from ..detreadoutmap import ReadoutUnitDescriptor, group_by_key
 
-# from detdataformats._daq_detdataformats_py import *
 from detdataformats import DetID
 
 
@@ -46,40 +35,7 @@ def compute_data_types(
     ):
     det_str = DetID.subdetector_to_string(DetID.Subdetector(stream_entry.geo_id.det_id))
 
-
-    # Far detector types
-    if (det_str in ("HD_TPC","VD_Bottom_TPC") and stream_entry.kind=='flx' ):
-        fe_type = "wib2"
-        queue_frag_type="WIB2Frame"
-        fakedata_frag_type = "WIB"
-        fakedata_time_tick=32
-        fakedata_frame_size=472
-    elif (det_str in ("HD_TPC","VD_Bottom_TPC") and stream_entry.kind=='eth' ):
-        fe_type = "wibeth"
-        queue_frag_type="WIBEthFrame"
-        fakedata_frag_type = "WIBEth"
-        fakedata_time_tick=2048
-        fakedata_frame_size=7200
-    elif det_str in ("HD_PDS", "VD_Cathode_PDS", "VD_Membrane_PDS") and stream_entry.parameters.mode == "var_rate":
-        fe_type = "pds"
-        fakedata_frag_type = "DAPHNE"
-        queue_frag_type = "PDSFrame"
-        fakedata_time_tick=None
-        fakedata_frame_size=472
-    elif det_str in ("HD_PDS", "VD_Cathode_PDS", "VD_Membrane_PDS") and  stream_entry.parameters.mode == "fix_rate":
-        fe_type = "pds_stream"
-        fakedata_frag_type = "DAPHNE"
-        queue_frag_type = "PDSStreamFrame"
-        fakedata_time_tick=None
-        fakedata_frame_size=472
-    elif det_str == "VD_Top_TPC":
-        fe_type = "tde"
-        fakedata_frag_type = "TDE_AMC"
-        queue_frag_type = "TDEFrame"
-        fakedata_time_tick=4472*32
-        fakedata_frame_size=8972
-    # Near detector types
-    elif det_str == "NDLAr_TPC":
+    if det_str == "NDLAr_TPC":
         fe_type = "pacman"
         fakedata_frag_type = "PACMAN"
         queue_frag_type = "PACMANFrame"
@@ -137,13 +93,6 @@ class NICReceiverBuilder:
             
         return m
     
-    # def streams_by_ru(self):
-    #     m = group_by_key(self.desc.streams, lambda s: (getattr(s.parameters, self.desc._host_label_map[s.kind]), getattr(s.parameters, self.desc._iflabel_map[s.kind]), s.kind, s.geo_id.det_id))
-    #     return m
-
-    def build_conf(self, eal_arg_list, lcores_id_set):
-
-
         streams_by_if_and_tx = self.streams_by_rxiface_and_tx_endpoint()
 
         ifcfgs = []
@@ -284,15 +233,6 @@ class ReadoutAppGenerator:
         modules = [DAQModule(name = "fake_source",
                                 plugin = "NDFakeCardReader",
                                 conf = conf)]
-        # queues = [
-        #     Queue(
-        #         f"fake_source.output_{s.src_id}",
-        #         f"datahandler_{s.src_id}.raw_input",
-        #         QUEUE_FRAGMENT_TYPE,
-        #         f'{FRONTEND_TYPE}_link_{s.src_id}', 100000
-        #     ) for s in RU_DESCRIPTOR.streams
-        # ]
-        
         queues = []
         for s in RU_DESCRIPTOR.streams:
             FRONTEND_TYPE, QUEUE_FRAGMENT_TYPE, _, _, _ = compute_data_types(s)
@@ -307,118 +247,6 @@ class ReadoutAppGenerator:
 
         return modules, queues
 
-
-    ###
-    # FELIX Card Reader creator
-    ###
-    def create_felix_cardreader(
-            self,
-            # FRONTEND_TYPE: str,
-            # QUEUE_FRAGMENT_TYPE: str,
-            CARD_ID_OVERRIDE: int,
-            NUMA_ID: int,
-            RU_DESCRIPTOR # ReadoutUnitDescriptor
-        ) -> tuple[list, list]:
-        """
-        Create a FELIX Card Reader (and reader->DHL Queues?)
-
-        [CR]->queues
-        """
-        links_slr0 = []
-        links_slr1 = []
-        strms_slr0 = []
-        strms_slr1 = []
-        for stream in RU_DESCRIPTOR.streams:
-            if stream.parameters.slr == 0:
-                links_slr0.append(stream.parameters.link)
-                strms_slr0.append(stream)
-            if stream.parameters.slr == 1:
-                links_slr1.append(stream.parameters.link)
-                strms_slr1.append(stream)
-
-        links_slr0.sort()
-        links_slr1.sort()
-
-        card_id = RU_DESCRIPTOR.iface if CARD_ID_OVERRIDE == -1 else CARD_ID_OVERRIDE
-
-        modules = []
-        queues = []
-        if len(links_slr0) > 0:
-            modules += [DAQModule(name = 'flxcard_0',
-                            plugin = 'FelixCardReader',
-                            conf = flxcr.Conf(card_id = card_id,
-                                                logical_unit = 0,
-                                                dma_id = 0,
-                                                chunk_trailer_size = 32,
-                                                dma_block_size_kb = 4,
-                                                dma_memory_size_gb = 4,
-                                                numa_id = NUMA_ID,
-                                                links_enabled = links_slr0
-                                            )
-                        )]
-        
-        if len(links_slr1) > 0:
-            modules += [DAQModule(name = "flxcard_1",
-                                plugin = "FelixCardReader",
-                                conf = flxcr.Conf(card_id = card_id,
-                                                    logical_unit = 1,
-                                                    dma_id = 0,
-                                                    chunk_trailer_size = 32,
-                                                    dma_block_size_kb = 4,
-                                                    dma_memory_size_gb = 4,
-                                                    numa_id = NUMA_ID,
-                                                    links_enabled = links_slr1
-                                                )
-                        )]
-        
-        # # Queues for card reader 1
-        # queues += [
-        #     Queue(
-        #         f'flxcard_0.output_{idx}',
-        #         f"datahandler_{idx}.raw_input",
-        #         QUEUE_FRAGMENT_TYPE,
-        #         f'{FRONTEND_TYPE}_link_{idx}',
-        #         100000 
-        #     ) for idx in strms_slr0
-        # ]
-        # # Queues for card reader 2
-        # queues += [
-        #     Queue(
-        #         f'flxcard_1.output_{idx}',
-        #         f"datahandler_{idx}.raw_input",
-        #         QUEUE_FRAGMENT_TYPE,
-        #         f'{FRONTEND_TYPE}_link_{idx}',
-        #         100000 
-        #     ) for idx in strms_slr1
-        # ]
-    
-        # Queues for card reader 1
-        for s in strms_slr0:
-            FRONTEND_TYPE, QUEUE_FRAGMENT_TYPE, _, _, _ = compute_data_types(s)
-            queues.append(
-                Queue(
-                    f'flxcard_0.output_{s.src_id}',
-                    f"datahandler_{s.src_id}.raw_input",
-                    QUEUE_FRAGMENT_TYPE,
-                    f'{FRONTEND_TYPE}_link_{s.src_id}',
-                    100000 
-                )
-            )
-        # Queues for card reader 2
-        for s in strms_slr1:
-            FRONTEND_TYPE, QUEUE_FRAGMENT_TYPE, _, _, _ = compute_data_types(s)
-            queues.append(
-                Queue(
-                    f'flxcard_1.output_{s.src_id}',
-                    f"datahandler_{s.src_id}.raw_input",
-                    QUEUE_FRAGMENT_TYPE,
-                    f'{FRONTEND_TYPE}_link_{s.src_id}',
-                    100000 
-                )
-            )
-
-
-        return modules, queues
 
 
     def create_dpdk_cardreader(
