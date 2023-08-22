@@ -176,13 +176,11 @@ class ReadoutAppGenerator:
             numa_id = ex['numa_id']
             latency_numa = ex['latency_buffer_numa_aware']
             latency_preallocate = ex['latency_buffer_preallocation']
-            flx_card_override = ex['felix_card_id']
         except KeyError:
             numa_id = cfg.numa_config['default_id']
             latency_numa = cfg.numa_config['default_latency_numa_aware']
             latency_preallocate = cfg.numa_config['default_latency_preallocation']
-            flx_card_override = -1
-        return (numa_id, latency_numa, latency_preallocate, flx_card_override)
+        return (numa_id, latency_numa, latency_preallocate)
 
     def get_lcore_config(self, RU_DESCRIPTOR):
         cfg = self.ro_cfg
@@ -201,11 +199,8 @@ class ReadoutAppGenerator:
     ###
     def create_fake_cardreader(
         self,
-        # FRONTEND_TYPE: str,
-        # QUEUE_FRAGMENT_TYPE: str,
         DATA_FILES: dict,
         RU_DESCRIPTOR # ReadoutUnitDescriptor
-
     ) -> tuple[list, list]:
         """
         Create a FAKE Card reader module
@@ -251,8 +246,6 @@ class ReadoutAppGenerator:
 
     def create_dpdk_cardreader(
             self,
-            # FRONTEND_TYPE: str,
-            # QUEUE_FRAGMENT_TYPE: str,
             RU_DESCRIPTOR # ReadoutUnitDescriptor
         ) -> tuple[list, list]:
         """
@@ -277,16 +270,6 @@ class ReadoutAppGenerator:
                         lcores_id_set=lcores_id_set
                         ),
                 )]
-
-        # Queues
-        # queues = [
-        #     Queue(
-        #         f"{nic_reader_name}.output_{stream.src_id}",
-        #         f"datahandler_{stream.src_id}.raw_input", QUEUE_FRAGMENT_TYPE,
-        #         f'{FRONTEND_TYPE}_stream_{stream.src_id}', 100000
-        #     ) 
-        #     for stream in RU_DESCRIPTOR.streams
-        # ]
         
         queues = []
         for stream in RU_DESCRIPTOR.streams:
@@ -303,14 +286,12 @@ class ReadoutAppGenerator:
         return modules, queues
     
 
-    def create_pacman_cardreader(
+    def create_nd_cardreader(
             self,
-            #FRONTEND_TYPE: str,
-            #QUEUE_FRAGMENT_TYPE: str,
             RU_DESCRIPTOR # ReadoutUnitDescriptor
         ) -> tuple[list, list]:
         """
-        Create a Pacman Cardeader 
+        Create a ND Cardeader 
         """
 
         FRONTEND_TYPE, _, _, _, _ = compute_data_types(RU_DESCRIPTOR.streams[0])
@@ -322,11 +303,11 @@ class ReadoutAppGenerator:
             reader_name = "mpd_source"
 
         else:
-            raise RuntimeError(f"Pacman Cardreader for {FRONTEND_TYPE} not supported")
+            raise RuntimeError(f"ND Cardreader for {FRONTEND_TYPE} not supported")
 
         modules = [DAQModule(
                     name=reader_name,
-                    plugin="PacmanCardReader",
+                    plugin="PacmanCardReader",   # should be changed after consulting at Core meeting on 30 Sept
                     conf=pcr.Conf(link_confs = [pcr.LinkConfiguration(Source_ID=stream.src_id)
                                         for stream in RU_DESCRIPTOR.streams],
                         zmq_receiver_timeout = 10000)
@@ -352,18 +333,12 @@ class ReadoutAppGenerator:
     ###
     def create_det_dhl(
             self,
-            # LATENCY_BUFFER_SIZE: int,
             LATENCY_BUFFER_NUMA_AWARE: int,
             LATENCY_BUFFER_ALLOCATION_MODE: int,
             NUMA_ID: int,
             SEND_PARTIAL_FRAGMENTS: bool,
-            # RAW_RECORDING_OUTPUT_DIR: str,
             DATA_REQUEST_TIMEOUT: int,
-            # FRAGMENT_SEND_TIMEOUT: int,
-            # RAW_RECORDING_ENABLED: bool,
-            RU_DESCRIPTOR, # ReadoutUnitDescriptor
-            # EMULATOR_MODE : bool
-    
+            RU_DESCRIPTOR # ReadoutUnitDescriptor
         ) -> tuple[list, list]:
 
         cfg = self.ro_cfg
@@ -547,11 +522,8 @@ class ReadoutAppGenerator:
         ) -> None: 
         """Adds detector readout endpoints and fragment producers"""
         for dlh in dlh_list:
-            # print(dlh)
-
             # extract source ids
             dro_sid = dlh.conf.readoutmodelconf['source_id']
-            # tp_sid = dlh.conf.rawdataprocessorconf.tpset_sourceid
 
             mgraph.add_fragment_producer(
                 id = dro_sid, 
@@ -632,17 +604,11 @@ class ReadoutAppGenerator:
             _type_: _description_
         """
 
-        numa_id, latency_numa, latency_preallocate, card_override = self.get_numa_cfg(RU_DESCRIPTOR)
+        numa_id, latency_numa, latency_preallocate = self.get_numa_cfg(RU_DESCRIPTOR)
         cfg = self.ro_cfg
         TPG_ENABLED = cfg.enable_tpg
         DATA_FILES = data_file_map
         DATA_REQUEST_TIMEOUT=data_timeout_requests
-
-        # FRONTEND_TYPE, QUEUE_FRAGMENT_TYPE, _, _, _ = compute_data_types(RU_DESCRIPTOR.det_id, self.det_cfg.clock_speed_hz, RU_DESCRIPTOR.kind)
-        
-        # TPG is automatically disabled for non wib2 frontends
-        # TPG_ENABLED = TPG_ENABLED and (FRONTEND_TYPE=='wib2' or FRONTEND_TYPE=='wibeth')
-        TPG_ENABLED = TPG_ENABLED and (RU_DESCRIPTOR.det_id == DetID.Subdetector.kHD_TPC.value)
         
         modules = []
         queues = []
@@ -656,29 +622,14 @@ class ReadoutAppGenerator:
         # Create the card readers
         if cfg.use_fake_cards:
             fakecr_mods, fakecr_queues = self.create_fake_cardreader(
-                # FRONTEND_TYPE=FRONTEND_TYPE,
-                # QUEUE_FRAGMENT_TYPE=QUEUE_FRAGMENT_TYPE,
                 DATA_FILES=DATA_FILES,
                 RU_DESCRIPTOR=RU_DESCRIPTOR
             )
             cr_mods += fakecr_mods
             cr_queues += fakecr_queues
         else:
-            if RU_DESCRIPTOR.kind == 'flx':
-                flx_mods, flx_queues = self.create_felix_cardreader(
-                    # FRONTEND_TYPE=FRONTEND_TYPE,
-                    # QUEUE_FRAGMENT_TYPE=QUEUE_FRAGMENT_TYPE,
-                    CARD_ID_OVERRIDE=card_override,
-                    NUMA_ID=numa_id,
-                    RU_DESCRIPTOR=RU_DESCRIPTOR
-                )
-                cr_mods += flx_mods
-                cr_queues += flx_queues
-
-            elif RU_DESCRIPTOR.kind == 'eth' and RU_DESCRIPTOR.streams[0].parameters.protocol == "udp":
+            if RU_DESCRIPTOR.kind == 'eth' and RU_DESCRIPTOR.streams[0].parameters.protocol == "udp":
                 dpdk_mods, dpdk_queues = self.create_dpdk_cardreader(
-                    # FRONTEND_TYPE=FRONTEND_TYPE,
-                    # QUEUE_FRAGMENT_TYPE=QUEUE_FRAGMENT_TYPE,
                     RU_DESCRIPTOR=RU_DESCRIPTOR
                 )
                 cr_mods += dpdk_mods
@@ -686,9 +637,7 @@ class ReadoutAppGenerator:
 
             elif RU_DESCRIPTOR.kind == 'eth' and RU_DESCRIPTOR.streams[0].parameters.protocol == "zmq":
 
-                pac_mods, pac_queues = self.create_pacman_cardreader(
-                    #FRONTEND_TYPE=FRONTEND_TYPE,
-                    #QUEUE_FRAGMENT_TYPE=QUEUE_FRAGMENT_TYPE,
+                pac_mods, pac_queues = self.create_nd_cardreader(
                     RU_DESCRIPTOR=RU_DESCRIPTOR
                 )
                 cr_mods += pac_mods
@@ -699,14 +648,12 @@ class ReadoutAppGenerator:
 
         # Create the data-link handlers
         dlhs_mods, _ = self.create_det_dhl(
-            # LATENCY_BUFFER_SIZE=cfg.latency_buffer_size,
             LATENCY_BUFFER_NUMA_AWARE=latency_numa,
             LATENCY_BUFFER_ALLOCATION_MODE=latency_preallocate,
             NUMA_ID=numa_id,
             SEND_PARTIAL_FRAGMENTS=False,
             DATA_REQUEST_TIMEOUT=DATA_REQUEST_TIMEOUT,
-            RU_DESCRIPTOR=RU_DESCRIPTOR,
-
+            RU_DESCRIPTOR=RU_DESCRIPTOR
         )
 
         # Configure the TP processing if requrested
@@ -754,15 +701,6 @@ class ReadoutAppGenerator:
         # Create the application
         readout_app = App(mgraph, host=RU_DESCRIPTOR.host_name)
 
-
-        # Kubernetes-specific extensions
-        if RU_DESCRIPTOR.kind == 'flx':
-            c = card_override if card_override != -1 else RU_DESCRIPTOR.iface
-            readout_app.resources = {
-                f"felix.cern/flx{c}-data": "1", # requesting FLX{c}
-                # "memory": f"{}Gi" # yes bro
-            }
-
         dir_names = set()
 
         cvmfs = Path('/cvmfs')
@@ -801,8 +739,6 @@ def create_fake_readout_app(
     modules = []
     queues = []
 
-    # _, _, fakedata_fragment_type, fakedata_time_tick, fakedata_frame_size = compute_data_types(RU_DESCRIPTOR.det_id, CLOCK_SPEED_HZ, RU_DESCRIPTOR.kind)
-
     for stream in RU_DESCRIPTOR.streams:
         _, _, fakedata_fragment_type, fakedata_time_tick, fakedata_frame_size = compute_data_types(stream)
 
@@ -831,5 +767,3 @@ def create_fake_readout_app(
 
     # All done
     return readout_app
-
-
