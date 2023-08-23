@@ -54,96 +54,6 @@ def compute_data_types(
     return fe_type, queue_frag_type, fakedata_frag_type, fakedata_time_tick, fakedata_frame_size
 
 
-###
-# DPDK Card Reader creator
-###
-class NICReceiverBuilder:
-
-    # FIXME: workaround to avoid lcore to be set to 0
-    # To be reviewd
-    lcore_offset = 1
-
-    def __init__(self, rudesc : ReadoutUnitDescriptor):
-        self.desc = rudesc
-
-
-    def streams_by_host(self):
-
-        iface_map = group_by_key(self.desc.streams, lambda s: s.parameters.rx_host)
-
-        return iface_map    
-
-    def streams_by_rxiface(self):
-        """Group streams by interface
-
-        Returns:
-            dict: A map of streams with the same destination ip, mac and host
-        """
-
-        iface_map = group_by_key(self.desc.streams, lambda s: (s.parameters.rx_ip, s.parameters.rx_mac, s.parameters.rx_host))
-
-        return iface_map
-
-    def streams_by_rxiface_and_tx_endpoint(self):
-
-        s_by_if = self.streams_by_rxiface()
-        m = {}
-        for k,v in s_by_if.items():
-            m[k] = group_by_key(v, lambda s: (s.parameters.tx_ip, s.parameters.tx_mac, s.parameters.tx_host))
-            
-        return m
-    
-        streams_by_if_and_tx = self.streams_by_rxiface_and_tx_endpoint()
-
-        ifcfgs = []
-        for (rx_ip, rx_mac, _),txs in streams_by_if_and_tx.items():
-            srcs = []
-            # Sid is used for the "Source.id". What is it?
-
-            # Transmitters are sorted by tx ip address.
-            # This is not good for understanding what is what, so we sort them by minimum
-            # src_id
-            txs_sorted_by_src = sorted(txs.items(), key=lambda x: min(x[1], key=lambda y: y.src_id))
-
-            for sid,((tx_ip,_,_),streams) in enumerate(txs_sorted_by_src):
-                ssm = nrc.SrcStreamsMapping([
-                        nrc.StreamMap(source_id=s.src_id, stream_id=s.geo_id.stream_id)
-                        for s in streams
-                    ])
-                geo_id = streams[0].geo_id
-                si = nrc.SrcGeoInfo(
-                    det_id=geo_id.det_id,
-                    crate_id=geo_id.crate_id,
-                    slot_id=geo_id.slot_id
-                )
-
-                srcs.append(
-                    nrc.Source(
-                        id=sid, # FIXME what is this ID?
-                        ip_addr=tx_ip,
-                        lcore=lcores_id_set[sid % len(lcores_id_set)],
-                        rx_q=sid,
-                        src_info=si,
-                        src_streams_mapping=ssm
-                    )
-                )
-            ifcfgs.append(
-                nrc.Interface(
-                    ip_addr=rx_ip,
-                    mac_addr=rx_mac,
-                    expected_sources=srcs
-                )
-            )         
-
-
-        conf = nrc.Conf(
-            ifaces = ifcfgs,
-            eal_arg_list=eal_arg_list
-        )
-
-        return conf
-    
-
 # Time to wait on pop()
 QUEUE_POP_WAIT_MS = 10 # This affects stop time, as each link will wait this long before stop
 
@@ -197,94 +107,52 @@ class ReadoutAppGenerator:
     ###
     # Fake Card Reader creator
     ###
-    def create_fake_cardreader(
-        self,
-        DATA_FILES: dict,
-        RU_DESCRIPTOR # ReadoutUnitDescriptor
-    ) -> tuple[list, list]:
-        """
-        Create a FAKE Card reader module
-        """
-        cfg = self.ro_cfg
-
-        conf = sec.Conf(
-                link_confs = [
-                    sec.LinkConfiguration(
-                        source_id=s.src_id,
-                            crate_id = s.geo_id.crate_id,
-                            slot_id = s.geo_id.slot_id,
-                            link_id = s.geo_id.stream_id,
-                            slowdown=self.daq_cfg.data_rate_slowdown_factor,
-                            queue_name=f"output_{s.src_id}",
-                            data_filename = DATA_FILES[s.geo_id.det_id] if s.geo_id.det_id in DATA_FILES.keys() else cfg.default_data_file,
-                            emu_frame_error_rate=0
-                        ) for s in RU_DESCRIPTOR.streams],
-                use_now_as_first_data_time=cfg.emulated_data_times_start_with_now,
-                clock_speed_hz=self.det_cfg.clock_speed_hz,
-                queue_timeout_ms = QUEUE_POP_WAIT_MS
-                )
-
-
-        modules = [DAQModule(name = "fake_source",
-                                plugin = "NDFakeCardReader",
-                                conf = conf)]
-        queues = []
-        for s in RU_DESCRIPTOR.streams:
-            FRONTEND_TYPE, QUEUE_FRAGMENT_TYPE, _, _, _ = compute_data_types(s)
-            queues.append(
-                Queue(
-                    f"fake_source.output_{s.src_id}",
-                    f"datahandler_{s.src_id}.raw_input",
-                    QUEUE_FRAGMENT_TYPE,
-                    f'{FRONTEND_TYPE}_link_{s.src_id}', 100000
-                )
-            )
-
-        return modules, queues
+    # Utility not yet available for the ND
+    #
+    #def create_fake_cardreader(
+    #    self,
+    #    DATA_FILES: dict,
+    #    RU_DESCRIPTOR # ReadoutUnitDescriptor
+    #) -> tuple[list, list]:
+    #    """
+    #    Create a FAKE Card reader module
+    #    """
+    #    cfg = self.ro_cfg
+    #
+    #    conf = sec.Conf(
+    #            link_confs = [
+    #                sec.LinkConfiguration(
+    #                    source_id=s.src_id,
+    #                        crate_id = s.geo_id.crate_id,
+    #                        slot_id = s.geo_id.slot_id,
+    #                        link_id = s.geo_id.stream_id,
+    #                        slowdown=self.daq_cfg.data_rate_slowdown_factor,
+    #                        queue_name=f"output_{s.src_id}",
+    #                        data_filename = DATA_FILES[s.geo_id.det_id] if s.geo_id.det_id in DATA_FILES.keys() else cfg.default_data_file,
+    #                        emu_frame_error_rate=0
+    #                    ) for s in RU_DESCRIPTOR.streams],
+    #            use_now_as_first_data_time=cfg.emulated_data_times_start_with_now,
+    #            clock_speed_hz=self.det_cfg.clock_speed_hz,
+    #            queue_timeout_ms = QUEUE_POP_WAIT_MS
+    #            )
 
 
-
-    def create_dpdk_cardreader(
-            self,
-            RU_DESCRIPTOR # ReadoutUnitDescriptor
-        ) -> tuple[list, list]:
-        """
-        Create a DPDK Card Reader (and reader->DHL Queues?)
-
-        [CR]->queues
-        """
-
-        cfg = self.ro_cfg
-
-        eth_ru_bldr = NICReceiverBuilder(RU_DESCRIPTOR)
-
-        nic_reader_name = f"nic_reader_{RU_DESCRIPTOR.iface}"
-
-        lcores_id_set = self.get_lcore_config(RU_DESCRIPTOR)
-
-        modules = [DAQModule(
-                    name=nic_reader_name,
-                    plugin="NICReceiver",
-                    conf=eth_ru_bldr.build_conf(
-                        eal_arg_list=cfg.dpdk_eal_args,
-                        lcores_id_set=lcores_id_set
-                        ),
-                )]
-        
-        queues = []
-        for stream in RU_DESCRIPTOR.streams:
-            FRONTEND_TYPE, QUEUE_FRAGMENT_TYPE, _, _, _ = compute_data_types(stream)
-            queues.append(
-                Queue(
-                    f"{nic_reader_name}.output_{stream.src_id}",
-                    f"datahandler_{stream.src_id}.raw_input",
-                    QUEUE_FRAGMENT_TYPE,
-                    f'{FRONTEND_TYPE}_stream_{stream.src_id}', 100000
-                )
-            )
-
-        return modules, queues
-    
+    #    modules = [DAQModule(name = "fake_source",
+    #                            plugin = "NDFakeCardReader",
+    #                            conf = conf)]
+    #    queues = []
+    #    for s in RU_DESCRIPTOR.streams:
+    #        FRONTEND_TYPE, QUEUE_FRAGMENT_TYPE, _, _, _ = compute_data_types(s)
+    #        queues.append(
+    #            Queue(
+    #                f"fake_source.output_{s.src_id}",
+    #                f"datahandler_{s.src_id}.raw_input",
+    #                QUEUE_FRAGMENT_TYPE,
+    #                f'{FRONTEND_TYPE}_link_{s.src_id}', 100000
+    #            )
+    #        )
+    #
+    #    return modules, queues
 
     def create_nd_cardreader(
             self,
