@@ -264,7 +264,7 @@ class ReadoutAppGenerator:
 
 
     ###
-    # Enable processing in DHLs
+    # Enable processing in DLHs
     ###
     def add_tp_processing(
             self,
@@ -488,28 +488,21 @@ class ReadoutAppGenerator:
 
 
         # Create the card readers
-        if cfg.use_fake_cards:
-            fakecr_mods, fakecr_queues = self.create_fake_cardreader(
-                DATA_FILES=DATA_FILES,
+        #if cfg.use_fake_cards:
+        #    fakecr_mods, fakecr_queues = self.create_fake_cardreader(
+        #        DATA_FILES=DATA_FILES,
+        #        RU_DESCRIPTOR=RU_DESCRIPTOR
+        #    )
+        #    cr_mods += fakecr_mods
+        #    cr_queues += fakecr_queues
+        # else : 
+        if RU_DESCRIPTOR.kind == 'eth' and RU_DESCRIPTOR.streams[0].parameters.protocol == "zmq":
+            
+            pac_mods, pac_queues = self.create_nd_cardreader(
                 RU_DESCRIPTOR=RU_DESCRIPTOR
             )
-            cr_mods += fakecr_mods
-            cr_queues += fakecr_queues
-        else:
-            if RU_DESCRIPTOR.kind == 'eth' and RU_DESCRIPTOR.streams[0].parameters.protocol == "udp":
-                dpdk_mods, dpdk_queues = self.create_dpdk_cardreader(
-                    RU_DESCRIPTOR=RU_DESCRIPTOR
-                )
-                cr_mods += dpdk_mods
-                cr_queues += dpdk_queues
-
-            elif RU_DESCRIPTOR.kind == 'eth' and RU_DESCRIPTOR.streams[0].parameters.protocol == "zmq":
-
-                pac_mods, pac_queues = self.create_nd_cardreader(
-                    RU_DESCRIPTOR=RU_DESCRIPTOR
-                )
-                cr_mods += pac_mods
-                cr_queues += pac_queues
+            cr_mods += pac_mods
+            cr_queues += pac_queues
 
         modules += cr_mods
         queues += cr_queues
