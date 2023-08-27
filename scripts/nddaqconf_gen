@@ -11,7 +11,7 @@ from daqconf.core.console import console
 
 from daqconf.core.system import System
 from daqconf.core.metadata import write_metadata_file, write_config_file
-from nddaqconf.core.sourceid import SourceIDBroker #, get_tpg_mode
+from daqconf.core.sourceid import SourceIDBroker #, get_tpg_mode
 from daqconf.core.config_file import generate_cli_from_schema
 from daqconf.core.assets import resolve_asset_file
 from detdataformats import *

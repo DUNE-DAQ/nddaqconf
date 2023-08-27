@@ -21,7 +21,7 @@ from os import path
 from pathlib import Path
 
 from ..core.conf_utils import Direction, Queue
-from ..core.sourceid import  SourceIDBroker
+from daqconf.core.sourceid import  SourceIDBroker
 from ..core.daqmodule import DAQModule
 from ..core.app import App, ModuleGraph
 from daqconf.detreadoutmap import ReadoutUnitDescriptor, group_by_key

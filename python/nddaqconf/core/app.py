@@ -1,6 +1,6 @@
 from nddaqconf.core.daqmodule import DAQModule
 from nddaqconf.core.conf_utils import Endpoint, Direction, FragmentProducer, Queue
-from nddaqconf.core.sourceid import SourceID, ensure_subsystem
+from daqconf.core.sourceid import SourceID, ensure_subsystem
 import networkx as nx
 from typing import List, Dict
 

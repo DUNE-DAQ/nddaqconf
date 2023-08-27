@@ -32,7 +32,7 @@ import dunedaq.trigger.tpchannelfilter as chfilter
 from nddaqconf.core.app import App, ModuleGraph
 from nddaqconf.core.daqmodule import DAQModule
 from nddaqconf.core.conf_utils import Direction, Queue
-from nddaqconf.core.sourceid import TAInfo, TPInfo, TCInfo
+from daqconf.core.sourceid import TAInfo, TPInfo, TCInfo
 
 from trgdataformats import TriggerBits as trgbs
 
