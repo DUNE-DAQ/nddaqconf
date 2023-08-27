@@ -1,4 +1,4 @@
-// This is the configuration schema for nddaqconf_multiru_gen
+// This is the configuration schema for nddaqconf_gen
 //
 
 local moo = import "moo.jsonnet";
@@ -40,7 +40,7 @@ local nc = moo.oschema.numeric_constraints;
 
 local cs = {
 
-  nddaqconf_multiru_gen: s.record('nddaqconf_multiru_gen', [
+  nddaqconf_gen: s.record('nddaqconf_gen', [
     s.field('detector',    detectorgen.detector,   default=detectorgen.detector,     doc='Boot parameters'),
     s.field('daq_common',  daqcommongen.daq_common, default=daqcommongen.daq_common,   doc='DAQ common parameters'),
     s.field('boot',        bootgen.boot,    default=bootgen.boot,      doc='Boot parameters'),

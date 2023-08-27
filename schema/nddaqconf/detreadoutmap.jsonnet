@@ -1,4 +1,4 @@
-// This is the configuration schema for nddaqconf_multiru_gen
+// This is the configuration schema for nddaqconf_gen
 //
 
 local moo = import "moo.jsonnet";

@@ -8,7 +8,7 @@ The `connect_modules`, `add_endpoint` methods and the `Queue` constructor from `
 
 When updating, it is useful to generate configurations and check the "queues" and "connections" lists in the generated *_init.json files for correct names and data types. Running a configuration with incorrect data types will produce error messages from IOManager which should include enough information to track down the connection causing the error. (Code issues such as undeclared data types can also cause IOManager issues, though that commonly results in one specific message: "Connection named "uid" of type Unknown not found".)
 
-## Updating Configuration Generation Scripts (e.g. listrev_gen, nddaqconf_multiru_gen)
+## Updating Configuration Generation Scripts (e.g. listrev_gen, nddaqconf_gen)
 
 The main change for configuration generation scripts is the addition of the "boot.use_connectivity_service" parameter to the main nddaqconf schema, which should be passed to make_app_command_data to enable/disable features of the configuration generation logic related to the ConnectivityService.
 
