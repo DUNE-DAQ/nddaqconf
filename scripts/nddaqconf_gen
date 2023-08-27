@@ -159,7 +159,7 @@ def create_df_apps(
 # Add -h as default help option
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.command(context_settings=CONTEXT_SETTINGS)
-@generate_cli_from_schema('nddaqconf/confgen.jsonnet', 'nddaqconf_multiru_gen', 'nddaqconf.dataflowgen.dataflowapp')
+@generate_cli_from_schema('nddaqconf/confgen.jsonnet', 'nddaqconf_gen', 'nddaqconf.dataflowgen.dataflowapp')
 @click.option('--force-pm', default=None, type=click.Choice(['ssh', 'k8s']), help="Force process manager")
 @click.option('--base-command-port', type=int, default=None, help="Base port of application command endpoints")
 @click.option('-m', '--detector-readout-map-file', default=None, help="File containing detector detector-readout map for configuration to run")
@@ -712,11 +712,11 @@ def cli(
 
         console.log(f"MDAapp config generated in {output_dir}")
 
-        write_metadata_file(output_dir, "nddaqconf_multiru_gen", config_file.as_posix())
+        write_metadata_file(output_dir, "nddaqconf_gen", config_file.as_posix())
         write_config_file(
             output_dir,
             config_file.name if config_file else "default.json",
-            confgen.nddaqconf_multiru_gen(  # :facepalm:
+            confgen.nddaqconf_gen(  # :facepalm:
                 boot = boot,
                 detector = detector,
                 daq_common = daq_common,
