@@ -20,10 +20,10 @@ import dunedaq.dfmodules.fakedataprod as fdp
 from os import path
 from pathlib import Path
 
-from ..core.conf_utils import Direction, Queue
+from daqconf.core.conf_utils import Direction, Queue
 from daqconf.core.sourceid import  SourceIDBroker
-from ..core.daqmodule import DAQModule
-from ..core.app import App, ModuleGraph
+from daqconf.core.daqmodule import DAQModule
+from daqconf.core.app import App, ModuleGraph
 from daqconf.detreadoutmap import ReadoutUnitDescriptor, group_by_key
 
 from detdataformats import DetID

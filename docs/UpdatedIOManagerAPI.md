@@ -4,7 +4,7 @@ IOManager made several changes which affect configuration generation for v3.3.0.
 
 ## Updating Application Configuration Generation Sripts (*_gen.py)
 
-The `connect_modules`, `add_endpoint` methods and the `Queue` constructor from `nddaqconf.core` now take an additional `data_type` parameter, which should match the data types declared in the code. In most cases, this is the same as the C++ class name (e.g. "TPSet", "Fragment"), but a few have been declared specifically (e.g. "WIBFrame" instead of "WIB_SUPERCHUNK_STRUCT").
+The `connect_modules`, `add_endpoint` methods and the `Queue` constructor from `daqconf.core` now take an additional `data_type` parameter, which should match the data types declared in the code. In most cases, this is the same as the C++ class name (e.g. "TPSet", "Fragment"), but a few have been declared specifically (e.g. "WIBFrame" instead of "WIB_SUPERCHUNK_STRUCT").
 
 When updating, it is useful to generate configurations and check the "queues" and "connections" lists in the generated *_init.json files for correct names and data types. Running a configuration with incorrect data types will produce error messages from IOManager which should include enough information to track down the connection causing the error. (Code issues such as undeclared data types can also cause IOManager issues, though that commonly results in one specific message: "Connection named "uid" of type Unknown not found".)
 

@@ -30,9 +30,9 @@ import dunedaq.hsilibs.hsireadout as hsir
 import dunedaq.hsilibs.hsicontroller as hsic
 import dunedaq.readoutlibs.readoutconfig as rconf
 
-from ..core.app import App, ModuleGraph
-from ..core.daqmodule import DAQModule
-from ..core.conf_utils import Direction, Queue
+from daqconf.core.app import App, ModuleGraph
+from daqconf.core.daqmodule import DAQModule
+from daqconf.core.conf_utils import Direction, Queue
 
 #===============================================================================
 def get_timing_hsi_app(

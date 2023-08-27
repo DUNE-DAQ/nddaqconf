@@ -1,4 +1,4 @@
-from nddaqconf.core.conf_utils import get_version, nightly_or_release, release_or_dev, get_rte_script
+from daqconf.core.conf_utils import get_version, nightly_or_release, release_or_dev, get_rte_script
 
 
 # How do I get rid all the fixtures and pytest_generate_tests??

@@ -600,8 +600,8 @@ def cli(
             console.log(f'Boot order: {boot_order}')
 
     #     console.log(f"MDAapp config generated in {json_dir}")
-    from nddaqconf.core.conf_utils import make_app_command_data
-    from nddaqconf.core.fragment_producers import  connect_all_fragment_producers, set_mlt_links#, remove_mlt_link
+    from daqconf.core.conf_utils import make_app_command_data
+    from daqconf.core.fragment_producers import  connect_all_fragment_producers, set_mlt_links#, remove_mlt_link
 
     if debug:
         the_system.export(debug_dir / "system_no_frag_prod_connection.dot")
@@ -634,7 +634,7 @@ def cli(
 
     ##################################################################################
     # Make boot.json config
-    from nddaqconf.core.conf_utils import make_system_command_datas, write_json_files
+    from daqconf.core.conf_utils import make_system_command_datas, write_json_files
 
     # HACK: Make sure RUs start after trigger
     forced_deps = []

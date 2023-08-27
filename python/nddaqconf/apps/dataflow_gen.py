@@ -21,10 +21,9 @@ import dunedaq.dfmodules.datawriter as dw
 import dunedaq.hdf5libs.hdf5filelayout as h5fl
 import dunedaq.dfmodules.hdf5datastore as hdf5ds
 
-from ..core.conf_utils import Direction, Queue
-from nddaqconf.core.app import App, ModuleGraph
-from nddaqconf.core.daqmodule import DAQModule
-from nddaqconf.core.conf_utils import Direction
+from daqconf.core.conf_utils import Direction, Queue
+from daqconf.core.app import App, ModuleGraph
+from daqconf.core.daqmodule import DAQModule
 
 # Time to wait on pop()
 QUEUE_POP_WAIT_MS = 100

@@ -23,9 +23,9 @@ import moo.otypes
 moo.otypes.load_types('timinglibs/timingpartitioncontroller.jsonnet')
 import dunedaq.timinglibs.timingpartitioncontroller as tprtc
 
-from nddaqconf.core.app import App, ModuleGraph
-from nddaqconf.core.daqmodule import DAQModule
-from nddaqconf.core.conf_utils import Direction
+from daqconf.core.app import App, ModuleGraph
+from daqconf.core.daqmodule import DAQModule
+from daqconf.core.conf_utils import Direction
 
 #===============================================================================
 def get_tprtc_app(
