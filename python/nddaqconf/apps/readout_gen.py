@@ -154,7 +154,7 @@ class ReadoutAppGenerator:
     #
     #    return modules, queues
 
-    def create_nd_cardreader(
+    def create_pacman_cardreader(
             self,
             RU_DESCRIPTOR # ReadoutUnitDescriptor
         ) -> tuple[list, list]:
@@ -498,7 +498,7 @@ class ReadoutAppGenerator:
         # else : 
         if RU_DESCRIPTOR.kind == 'eth' and RU_DESCRIPTOR.streams[0].parameters.protocol == "zmq":
             
-            pac_mods, pac_queues = self.create_nd_cardreader(
+            pac_mods, pac_queues = self.create_pacman_cardreader(
                 RU_DESCRIPTOR=RU_DESCRIPTOR
             )
             cr_mods += pac_mods
