@@ -24,7 +24,7 @@ from ..core.conf_utils import Direction, Queue
 from ..core.sourceid import  SourceIDBroker
 from ..core.daqmodule import DAQModule
 from ..core.app import App, ModuleGraph
-from ..detreadoutmap import ReadoutUnitDescriptor, group_by_key
+from daqconf.detreadoutmap import ReadoutUnitDescriptor, group_by_key
 
 from detdataformats import DetID
 

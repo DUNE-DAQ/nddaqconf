@@ -27,7 +27,8 @@ import dunedaq.iomanager.connection as conn
 
 from nddaqconf.core.daqmodule import DAQModule
 
-from .console import console
+from daqconf.core.console import console
+
 
 ########################################################################
 #

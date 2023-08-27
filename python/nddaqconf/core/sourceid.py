@@ -6,7 +6,7 @@ from rich.console import Console
 from enum import Enum
 from collections import namedtuple, defaultdict
 
-from .console import console
+from daqconf.core.console import console
 
 
 from daqdataformats import SourceID

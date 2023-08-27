@@ -12,7 +12,7 @@
 
 import math
 # from rich.console import Console
-from ..core.console import console
+from daqconf.core.console import console
 # Set moo schema search path
 from dunedaq.env import get_moo_model_path
 import moo.io
