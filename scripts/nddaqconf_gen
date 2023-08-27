@@ -258,27 +258,27 @@ def cli(
     validate_conf(boot, readout, dataflow, timing, hsi, dqm)
 
     console.log("Loading dataflow config generator")
-    from nddaqconf.apps.dataflow_gen import get_dataflow_app
+    from daqconf.apps.dataflow_gen import get_dataflow_app
     if dqm.enable_dqm:
         console.log("Loading dqm config generator")
         from nddaqconf.apps.dqm_gen import get_dqm_app
     console.log("Loading readout config generator")
     from nddaqconf.apps.readout_gen import create_fake_readout_app, ReadoutAppGenerator
     console.log("Loading trigger config generator")
-    from nddaqconf.apps.trigger_gen import get_trigger_app
+    from daqconf.apps.trigger_gen import get_trigger_app
     console.log("Loading DFO config generator")
-    from nddaqconf.apps.dfo_gen import get_dfo_app
+    from daqconf.apps.dfo_gen import get_dfo_app
     console.log("Loading timing hsi config generator")
-    from nddaqconf.apps.hsi_gen import get_timing_hsi_app
+    from daqconf.apps.hsi_gen import get_timing_hsi_app
     console.log("Loading fake hsi config generator")
-    from nddaqconf.apps.fake_hsi_gen import get_fake_hsi_app
+    from daqconf.apps.fake_hsi_gen import get_fake_hsi_app
     console.log("Loading timing partition controller config generator")
-    from nddaqconf.apps.tprtc_gen import get_tprtc_app
+    from daqconf.apps.tprtc_gen import get_tprtc_app
     console.log("Loading DPDK sender config generator")
 
     if dataflow.enable_tpset_writing:
         console.log("Loading TPWriter config generator")
-        from nddaqconf.apps.tpwriter_gen import get_tpwriter_app
+        from daqconf.apps.tpwriter_gen import get_tpwriter_app
 
     sourceid_broker = SourceIDBroker()
     sourceid_broker.debug = debug
