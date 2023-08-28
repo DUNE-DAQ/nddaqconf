@@ -159,11 +159,11 @@ class ReadoutAppGenerator:
             RU_DESCRIPTOR # ReadoutUnitDescriptor
         ) -> tuple[list, list]:
         """
-        Create a ND Cardeader 
+        Create a Pacman Cardeader 
         """
 
         FRONTEND_TYPE, _, _, _, _ = compute_data_types(RU_DESCRIPTOR.streams[0])
-        reader_name = "nd_reader" 
+        reader_name = "pacman_reader" 
         if FRONTEND_TYPE == 'pacman':
             reader_name = "pacman_source"
 
@@ -171,7 +171,7 @@ class ReadoutAppGenerator:
             reader_name = "mpd_source"
 
         else:
-            raise RuntimeError(f"ND Cardreader for {FRONTEND_TYPE} not supported")
+            raise RuntimeError(f"PACMAN Cardreader for {FRONTEND_TYPE} not supported")
 
         modules = [DAQModule(
                     name=reader_name,
