@@ -31,20 +31,15 @@ def expand_conf(config_data, debug=False):
         _type_: _description_
     """
 
-    # JTV: these packages must be imporeted from daqconf as they are common 
-    # start with bootgen (looks simpler than confgen)
     import dunedaq.nddaqconf.confgen as confgen
-    import dunedaq.nddaqconf.bootgen as bootgen
-    import dunedaq.nddaqconf.detectorgen as detectorgen
-    import dunedaq.nddaqconf.daqcommongen as daqcommongen
-    import dunedaq.nddaqconf.timinggen as timinggen
-    import dunedaq.nddaqconf.hsigen as hsigen
-    import dunedaq.nddaqconf.triggergen as triggergen
-    import dunedaq.nddaqconf.dataflowgen as dataflowgen
-    import dunedaq.nddaqconf.dqmgen as dqmgen
-    # JTV: <- change to dunedaq.daqconf. until here
-
-    # JTV: readout gen from nddaqconf
+    import dunedaq.daqconf.bootgen as bootgen
+    import dunedaq.daqconf.detectorgen as detectorgen
+    import dunedaq.daqconf.daqcommongen as daqcommongen
+    import dunedaq.daqconf.timinggen as timinggen
+    import dunedaq.daqconf.hsigen as hsigen
+    import dunedaq.daqconf.triggergen as triggergen
+    import dunedaq.daqconf.dataflowgen as dataflowgen
+    import dunedaq.daqconf.dqmgen as dqmgen
     import dunedaq.nddaqconf.readoutgen as readoutgen
 
     ## Hack, we shouldn't need to do that, in the future it should be, boot = config_data.boot
@@ -134,8 +129,7 @@ def create_df_apps(
         sourceid_broker
     ):
 
-    # JTV: to change to  dunedaq.daqconf.dataflowgen
-    import dunedaq.nddaqconf.dataflowgen as dataflowgen
+    import dunedaq.daqconf.dataflowgen as dataflowgen
 
     if len(dataflow.apps) == 0:
         console.log(f"No Dataflow apps defined, adding default dataflow0")
@@ -166,9 +160,7 @@ def create_df_apps(
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.command(context_settings=CONTEXT_SETTINGS)
 
-# JTV: these are using moo for schema driven code generation. We must understand how to change the following function accordingly:
-# We must use daqconf/confgen.jsonnet with the near detector configuration app (nddaqconf_gen)
-@generate_cli_from_schema('nddaqconf/confgen.jsonnet', 'nddaqconf_gen', 'nddaqconf.dataflowgen.dataflowapp')
+@generate_cli_from_schema('nddaqconf/confgen.jsonnet', 'nddaqconf_gen', 'daqconf.dataflowgen.dataflowapp')
 @click.option('--force-pm', default=None, type=click.Choice(['ssh', 'k8s']), help="Force process manager")
 @click.option('--base-command-port', type=int, default=None, help="Base port of application command endpoints")
 @click.option('-m', '--detector-readout-map-file', default=None, help="File containing detector detector-readout map for configuration to run")
@@ -715,7 +707,6 @@ def cli(
 
 
     if not dry_run:
-        # JTV: to change to dunedaq.daqconf.confgen
         import dunedaq.nddaqconf.confgen as confgen
 
         write_json_files(app_command_datas, system_command_datas, output_dir, verbose=debug)
