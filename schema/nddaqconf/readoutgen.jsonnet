@@ -3,8 +3,8 @@
 
 local moo = import "moo.jsonnet";
 
-local stypes = import "nddaqconf/types.jsonnet";
-local types = moo.oschema.hier(stypes).dunedaq.nddaqconf.types;
+local stypes = import "daqconf/types.jsonnet";
+local types = moo.oschema.hier(stypes).dunedaq.daqconf.types;
 
 local s = moo.oschema.schema("dunedaq.nddaqconf.readoutgen");
 local nc = moo.oschema.numeric_constraints;
