@@ -544,15 +544,24 @@ class NDReadoutAppGenerator(ReadoutAppGenerator):
         cr_mods = []
         cr_queues = []
 
-        if RU_DESCRIPTOR.kind == 'eth' and RU_DESCRIPTOR.streams[0].parameters.protocol == "zmq":
-            
-            pac_mods, pac_queues = self.create_pacman_cardreader(
+        # Create the card readers
+        if cfg.use_fake_cards:
+            fakecr_mods, fakecr_queues = self.create_fake_cardreader(
+                DATA_FILES=DATA_FILES,
                 RU_DESCRIPTOR=RU_DESCRIPTOR
             )
-            cr_mods += pac_mods
-            cr_queues += pac_queues
-        else:
-            raise RuntimeError("Card reader could not be created.")
+            cr_mods += fakecr_mods
+            cr_queues += fakecr_queues
+        else : 
+            if RU_DESCRIPTOR.kind == 'eth' and RU_DESCRIPTOR.streams[0].parameters.protocol == "zmq":
+            
+                pac_mods, pac_queues = self.create_pacman_cardreader(
+                    RU_DESCRIPTOR=RU_DESCRIPTOR
+                )
+                cr_mods += pac_mods
+                cr_queues += pac_queues
+            else:
+                raise RuntimeError("Card reader could not be created.")
 
         return cr_mods, cr_queues
 
