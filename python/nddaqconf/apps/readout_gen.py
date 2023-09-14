@@ -391,7 +391,6 @@ class ReadoutAppGenerator:
         Returns:
             _type_: _description_
         """
-
         numa_id, latency_numa, latency_preallocate = self.get_numa_cfg(RU_DESCRIPTOR)
         cfg = self.ro_cfg
         TPG_ENABLED = cfg.enable_tpg
@@ -407,7 +406,8 @@ class ReadoutAppGenerator:
         cr_queues = []
 
         cr_mods, cr_queues = self.create_cardreader(
-            RU_DESCRIPTOR=RU_DESCRIPTOR
+            RU_DESCRIPTOR=RU_DESCRIPTOR,
+            data_file_map=data_file_map
         )
 
         modules += cr_mods
@@ -540,6 +540,10 @@ class NDReadoutAppGenerator(ReadoutAppGenerator):
 
 
     def create_cardreader(self, RU_DESCRIPTOR, data_file_map):
+        # Create the card readers
+        cr_mods = []
+        cr_queues = []
+
         if RU_DESCRIPTOR.kind == 'eth' and RU_DESCRIPTOR.streams[0].parameters.protocol == "zmq":
             
             pac_mods, pac_queues = self.create_pacman_cardreader(
