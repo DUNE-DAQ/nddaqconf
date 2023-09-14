@@ -60,7 +60,7 @@ QUEUE_POP_WAIT_MS = 10 # This affects stop time, as each link will wait this lon
 
 class ReadoutAppGenerator:
     """Utility class to generate readout applications"""
-
+    
     dlh_plugin = None
 
     def __init__(self, readout_cfg, det_cfg, daq_cfg):
@@ -111,98 +111,6 @@ class ReadoutAppGenerator:
 
         return [],[]
     
-    ###
-    # Fake Card Reader creator
-    ###
-    # Utility not yet available for the ND
-    #
-    #def create_fake_cardreader(
-    #    self,
-    #    DATA_FILES: dict,
-    #    RU_DESCRIPTOR # ReadoutUnitDescriptor
-    #) -> tuple[list, list]:
-    #    """
-    #    Create a FAKE Card reader module
-    #    """
-    #    cfg = self.ro_cfg
-    #
-    #    conf = sec.Conf(
-    #            link_confs = [
-    #                sec.LinkConfiguration(
-    #                    source_id=s.src_id,
-    #                        crate_id = s.geo_id.crate_id,
-    #                        slot_id = s.geo_id.slot_id,
-    #                        link_id = s.geo_id.stream_id,
-    #                        slowdown=self.daq_cfg.data_rate_slowdown_factor,
-    #                        queue_name=f"output_{s.src_id}",
-    #                        data_filename = DATA_FILES[s.geo_id.det_id] if s.geo_id.det_id in DATA_FILES.keys() else cfg.default_data_file,
-    #                        emu_frame_error_rate=0
-    #                    ) for s in RU_DESCRIPTOR.streams],
-    #            use_now_as_first_data_time=cfg.emulated_data_times_start_with_now,
-    #            clock_speed_hz=self.det_cfg.clock_speed_hz,
-    #            queue_timeout_ms = QUEUE_POP_WAIT_MS
-    #            )
-
-
-    #    modules = [DAQModule(name = "fake_source",
-    #                            plugin = "NDFakeCardReader",
-    #                            conf = conf)]
-    #    queues = []
-    #    for s in RU_DESCRIPTOR.streams:
-    #        FRONTEND_TYPE, QUEUE_FRAGMENT_TYPE, _, _, _ = compute_data_types(s)
-    #        queues.append(
-    #            Queue(
-    #                f"fake_source.output_{s.src_id}",
-    #                f"datahandler_{s.src_id}.raw_input",
-    #                QUEUE_FRAGMENT_TYPE,
-    #                f'{FRONTEND_TYPE}_link_{s.src_id}', 100000
-    #            )
-    #        )
-    #
-    #    return modules, queues
-
-    # def create_pacman_cardreader(
-    #         self,
-    #         RU_DESCRIPTOR # ReadoutUnitDescriptor
-    #     ) -> tuple[list, list]:
-    #     """
-    #     Create a Pacman Cardeader 
-    #     """
-
-    #     FRONTEND_TYPE, _, _, _, _ = compute_data_types(RU_DESCRIPTOR.streams[0])
-    #     reader_name = "pacman_reader" 
-    #     if FRONTEND_TYPE == 'pacman':
-    #         reader_name = "pacman_source"
-
-    #     elif FRONTEND_TYPE == 'mpd':
-    #         reader_name = "mpd_source"
-
-    #     else:
-    #         raise RuntimeError(f"PACMAN Cardreader for {FRONTEND_TYPE} not supported")
-
-    #     modules = [DAQModule(
-    #                 name=reader_name,
-    #                 plugin="PacmanCardReader",   # should be changed after consulting at Core meeting on 30 Sept
-    #                 conf=pcr.Conf(link_confs = [pcr.LinkConfiguration(Source_ID=stream.src_id)
-    #                                     for stream in RU_DESCRIPTOR.streams],
-    #                     zmq_receiver_timeout = 10000)
-    #             )]
-
-    #     # Queues
-    #     queues = []
-    #     for s in RU_DESCRIPTOR.streams:
-    #         FRONTEND_TYPE, QUEUE_FRAGMENT_TYPE, _, _, _ = compute_data_types(s)
-    #         queues.append(
-    #             Queue(
-    #                 f"{reader_name}.output_{s.src_id}",
-    #                 f"datahandler_{s.src_id}.raw_input", QUEUE_FRAGMENT_TYPE,
-    #                 f'{FRONTEND_TYPE}_stream_{s.src_id}', 100000
-    #             )
-    #         )
-
-    #     return modules, queues
-
-
     ###
     # Create detector datalink handlers
     ###
@@ -345,11 +253,13 @@ class ReadoutAppGenerator:
         default_latency_buffer_size = 4000000
         default_detid = 1
 
-        
+        if self.dlh_plugin is None:
+            raise NotImplementedError("DataLinkHandler plugin must be specified in derived classses!")
+
         # Create the TP link handler
         modules = [
         DAQModule(name = f"tp_datahandler_{tpset_sid}",
-                    plugin = "NDDataLinkHandler",
+                    plugin = self.dlh_plugin,
                     conf = rconf.Conf(
                                 readoutmodelconf = rconf.ReadoutModelConf(
                                     source_queue_timeout_ms = QUEUE_POP_WAIT_MS,
@@ -496,24 +406,6 @@ class ReadoutAppGenerator:
         cr_mods = []
         cr_queues = []
 
-
-        # Create the card readers
-        #if cfg.use_fake_cards:
-        #    fakecr_mods, fakecr_queues = self.create_fake_cardreader(
-        #        DATA_FILES=DATA_FILES,
-        #        RU_DESCRIPTOR=RU_DESCRIPTOR
-        #    )
-        #    cr_mods += fakecr_mods
-        #    cr_queues += fakecr_queues
-        # else : 
-        # if RU_DESCRIPTOR.kind == 'eth' and RU_DESCRIPTOR.streams[0].parameters.protocol == "zmq":
-            
-        #     pac_mods, pac_queues = self.create_pacman_cardreader(
-        #         RU_DESCRIPTOR=RU_DESCRIPTOR
-        #     )
-        #     cr_mods += pac_mods
-        #     cr_queues += pac_queues
-
         cr_mods, cr_queues = self.create_cardreader(
             RU_DESCRIPTOR=RU_DESCRIPTOR
         )
@@ -656,7 +548,7 @@ class NDReadoutAppGenerator(ReadoutAppGenerator):
             cr_mods += pac_mods
             cr_queues += pac_queues
         else:
-            raise RuntimeError("AAAAAARGH!!!")
+            raise RuntimeError("Card reader could not be created.")
 
         return cr_mods, cr_queues
 
