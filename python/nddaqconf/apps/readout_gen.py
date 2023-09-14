@@ -61,6 +61,8 @@ QUEUE_POP_WAIT_MS = 10 # This affects stop time, as each link will wait this lon
 class ReadoutAppGenerator:
     """Utility class to generate readout applications"""
 
+    dlh_plugin = None
+
     def __init__(self, readout_cfg, det_cfg, daq_cfg):
 
         self.ro_cfg = readout_cfg
@@ -103,7 +105,12 @@ class ReadoutAppGenerator:
         
         return list(dict.fromkeys(lcore_id_set))
 
+    def create_cardreader(self, RU_DESCRIPTOR, data_file_map):
 
+        raise NotImplementedError("create_cardreader must be implemented in detived classes!")
+
+        return [],[]
+    
     ###
     # Fake Card Reader creator
     ###
@@ -154,46 +161,46 @@ class ReadoutAppGenerator:
     #
     #    return modules, queues
 
-    def create_pacman_cardreader(
-            self,
-            RU_DESCRIPTOR # ReadoutUnitDescriptor
-        ) -> tuple[list, list]:
-        """
-        Create a Pacman Cardeader 
-        """
+    # def create_pacman_cardreader(
+    #         self,
+    #         RU_DESCRIPTOR # ReadoutUnitDescriptor
+    #     ) -> tuple[list, list]:
+    #     """
+    #     Create a Pacman Cardeader 
+    #     """
 
-        FRONTEND_TYPE, _, _, _, _ = compute_data_types(RU_DESCRIPTOR.streams[0])
-        reader_name = "pacman_reader" 
-        if FRONTEND_TYPE == 'pacman':
-            reader_name = "pacman_source"
+    #     FRONTEND_TYPE, _, _, _, _ = compute_data_types(RU_DESCRIPTOR.streams[0])
+    #     reader_name = "pacman_reader" 
+    #     if FRONTEND_TYPE == 'pacman':
+    #         reader_name = "pacman_source"
 
-        elif FRONTEND_TYPE == 'mpd':
-            reader_name = "mpd_source"
+    #     elif FRONTEND_TYPE == 'mpd':
+    #         reader_name = "mpd_source"
 
-        else:
-            raise RuntimeError(f"PACMAN Cardreader for {FRONTEND_TYPE} not supported")
+    #     else:
+    #         raise RuntimeError(f"PACMAN Cardreader for {FRONTEND_TYPE} not supported")
 
-        modules = [DAQModule(
-                    name=reader_name,
-                    plugin="PacmanCardReader",   # should be changed after consulting at Core meeting on 30 Sept
-                    conf=pcr.Conf(link_confs = [pcr.LinkConfiguration(Source_ID=stream.src_id)
-                                        for stream in RU_DESCRIPTOR.streams],
-                        zmq_receiver_timeout = 10000)
-                )]
+    #     modules = [DAQModule(
+    #                 name=reader_name,
+    #                 plugin="PacmanCardReader",   # should be changed after consulting at Core meeting on 30 Sept
+    #                 conf=pcr.Conf(link_confs = [pcr.LinkConfiguration(Source_ID=stream.src_id)
+    #                                     for stream in RU_DESCRIPTOR.streams],
+    #                     zmq_receiver_timeout = 10000)
+    #             )]
 
-        # Queues
-        queues = []
-        for s in RU_DESCRIPTOR.streams:
-            FRONTEND_TYPE, QUEUE_FRAGMENT_TYPE, _, _, _ = compute_data_types(s)
-            queues.append(
-                Queue(
-                    f"{reader_name}.output_{s.src_id}",
-                    f"datahandler_{s.src_id}.raw_input", QUEUE_FRAGMENT_TYPE,
-                    f'{FRONTEND_TYPE}_stream_{s.src_id}', 100000
-                )
-            )
+    #     # Queues
+    #     queues = []
+    #     for s in RU_DESCRIPTOR.streams:
+    #         FRONTEND_TYPE, QUEUE_FRAGMENT_TYPE, _, _, _ = compute_data_types(s)
+    #         queues.append(
+    #             Queue(
+    #                 f"{reader_name}.output_{s.src_id}",
+    #                 f"datahandler_{s.src_id}.raw_input", QUEUE_FRAGMENT_TYPE,
+    #                 f'{FRONTEND_TYPE}_stream_{s.src_id}', 100000
+    #             )
+    #         )
 
-        return modules, queues
+    #     return modules, queues
 
 
     ###
@@ -209,6 +216,9 @@ class ReadoutAppGenerator:
             RU_DESCRIPTOR # ReadoutUnitDescriptor
         ) -> tuple[list, list]:
 
+        if self.dlh_plugin is None:
+            raise NotImplementedError("DataLinkHandler plugin must be specified in derived classses!")
+
         cfg = self.ro_cfg
 
         # defaults hardcoded values
@@ -223,7 +233,7 @@ class ReadoutAppGenerator:
             geo_id = stream.geo_id
             modules += [DAQModule(
                         name = f"datahandler_{stream.src_id}",
-                        plugin = "NDDataLinkHandler", 
+                        plugin = self.dlh_plugin, 
                         conf = rconf.Conf(
                             readoutmodelconf= rconf.ReadoutModelConf(
                                 source_queue_timeout_ms= QUEUE_POP_WAIT_MS,
@@ -496,13 +506,17 @@ class ReadoutAppGenerator:
         #    cr_mods += fakecr_mods
         #    cr_queues += fakecr_queues
         # else : 
-        if RU_DESCRIPTOR.kind == 'eth' and RU_DESCRIPTOR.streams[0].parameters.protocol == "zmq":
+        # if RU_DESCRIPTOR.kind == 'eth' and RU_DESCRIPTOR.streams[0].parameters.protocol == "zmq":
             
-            pac_mods, pac_queues = self.create_pacman_cardreader(
-                RU_DESCRIPTOR=RU_DESCRIPTOR
-            )
-            cr_mods += pac_mods
-            cr_queues += pac_queues
+        #     pac_mods, pac_queues = self.create_pacman_cardreader(
+        #         RU_DESCRIPTOR=RU_DESCRIPTOR
+        #     )
+        #     cr_mods += pac_mods
+        #     cr_queues += pac_queues
+
+        cr_mods, cr_queues = self.create_cardreader(
+            RU_DESCRIPTOR=RU_DESCRIPTOR
+        )
 
         modules += cr_mods
         queues += cr_queues
@@ -587,6 +601,64 @@ class ReadoutAppGenerator:
     
 
 
+class NDReadoutAppGenerator(ReadoutAppGenerator):
+
+    dlh_plugin = "NDDataLinkHandler"
+
+    def create_pacman_cardreader(
+            self,
+            RU_DESCRIPTOR # ReadoutUnitDescriptor
+        ) -> tuple[list, list]:
+        """
+        Create a Pacman Cardeader 
+        """
+
+        FRONTEND_TYPE, _, _, _, _ = compute_data_types(RU_DESCRIPTOR.streams[0])
+        reader_name = "pacman_reader" 
+        if FRONTEND_TYPE == 'pacman':
+            reader_name = "pacman_source"
+
+        elif FRONTEND_TYPE == 'mpd':
+            reader_name = "mpd_source"
+
+        else:
+            raise RuntimeError(f"PACMAN Cardreader for {FRONTEND_TYPE} not supported")
+
+        modules = [DAQModule(
+                    name=reader_name,
+                    plugin="PacmanCardReader",   # should be changed after consulting at Core meeting on 30 Sept
+                    conf=pcr.Conf(link_confs = [pcr.LinkConfiguration(Source_ID=stream.src_id)
+                                        for stream in RU_DESCRIPTOR.streams],
+                        zmq_receiver_timeout = 10000)
+                )]
+
+        # Queues
+        queues = []
+        for s in RU_DESCRIPTOR.streams:
+            FRONTEND_TYPE, QUEUE_FRAGMENT_TYPE, _, _, _ = compute_data_types(s)
+            queues.append(
+                Queue(
+                    f"{reader_name}.output_{s.src_id}",
+                    f"datahandler_{s.src_id}.raw_input", QUEUE_FRAGMENT_TYPE,
+                    f'{FRONTEND_TYPE}_stream_{s.src_id}', 100000
+                )
+            )
+
+        return modules, queues
+
+
+    def create_cardreader(self, RU_DESCRIPTOR, data_file_map):
+        if RU_DESCRIPTOR.kind == 'eth' and RU_DESCRIPTOR.streams[0].parameters.protocol == "zmq":
+            
+            pac_mods, pac_queues = self.create_pacman_cardreader(
+                RU_DESCRIPTOR=RU_DESCRIPTOR
+            )
+            cr_mods += pac_mods
+            cr_queues += pac_queues
+        else:
+            raise RuntimeError("AAAAAARGH!!!")
+
+        return cr_mods, cr_queues
 
 ###
 # Create Fake dataproducers Application
