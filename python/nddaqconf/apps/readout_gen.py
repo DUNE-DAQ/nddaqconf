@@ -543,7 +543,8 @@ class NDReadoutAppGenerator(ReadoutAppGenerator):
         # Create the card readers
         cr_mods = []
         cr_queues = []
-
+        cfg = self.ro_cfg
+        
         # Create the card readers
         if cfg.use_fake_cards:
             fakecr_mods, fakecr_queues = self.create_fake_cardreader(
