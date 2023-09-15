@@ -112,7 +112,7 @@ class NDReadoutAppGenerator(ReadoutAppGenerator):
         # Create the card readers
         if cfg.use_fake_cards:
             fakecr_mods, fakecr_queues = self.create_fake_cardreader(
-                DATA_FILES=DATA_FILES,
+                DATA_FILES=data_file_map,
                 RU_DESCRIPTOR=RU_DESCRIPTOR
             )
             cr_mods += fakecr_mods
