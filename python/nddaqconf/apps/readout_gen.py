@@ -61,6 +61,57 @@ class NDReadoutAppGenerator(ReadoutAppGenerator):
 
     dlh_plugin = "NDDataLinkHandler"
 
+    def create_fake_cardreader(
+        self,
+        # FRONTEND_TYPE: str,
+        # QUEUE_FRAGMENT_TYPE: str,
+        DATA_FILES: dict,
+        RU_DESCRIPTOR # ReadoutUnitDescriptor
+
+    ) -> tuple[list, list]:
+        """
+        Create a FAKE Card reader module
+        """
+        cfg = self.ro_cfg
+
+        conf = sec.Conf(
+                link_confs = [
+                    sec.LinkConfiguration(
+                        source_id=s.src_id,
+                            crate_id = s.geo_id.crate_id,
+                            slot_id = s.geo_id.slot_id,
+                            link_id = s.geo_id.stream_id,
+                            slowdown=self.daq_cfg.data_rate_slowdown_factor,
+                            queue_name=f"output_{s.src_id}",
+                            data_filename = DATA_FILES[s.geo_id.det_id] if s.geo_id.det_id in DATA_FILES.keys() else cfg.default_data_file,
+                            emu_frame_error_rate=0
+                        ) for s in RU_DESCRIPTOR.streams],
+                use_now_as_first_data_time=cfg.emulated_data_times_start_with_now,
+                generate_periodic_adc_pattern = cfg.generate_periodic_adc_pattern,  
+                TP_rate_per_ch = cfg.emulated_TP_rate_per_ch,  
+                clock_speed_hz=self.det_cfg.clock_speed_hz,
+                queue_timeout_ms = QUEUE_POP_WAIT_MS
+                )
+
+
+        modules = [DAQModule(name = "fake_source",
+                                plugin = "NDFakeCardReader",
+                                conf = conf)]
+      
+        queues = []
+        for s in RU_DESCRIPTOR.streams:
+            FRONTEND_TYPE, QUEUE_FRAGMENT_TYPE, _, _, _ = compute_data_types(s)
+            queues.append(
+                Queue(
+                    f"fake_source.output_{s.src_id}",
+                    f"datahandler_{s.src_id}.raw_input",
+                    QUEUE_FRAGMENT_TYPE,
+                    f'{FRONTEND_TYPE}_link_{s.src_id}', 100000
+                )
+            )
+
+        return modules, queues
+
     def create_pacman_cardreader(
             self,
             RU_DESCRIPTOR # ReadoutUnitDescriptor
