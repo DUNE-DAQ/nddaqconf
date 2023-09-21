@@ -54,6 +54,50 @@ def compute_data_types(
     return fe_type, queue_frag_type, fakedata_frag_type, fakedata_time_tick, fakedata_frame_size
 
 
+###
+# Create Fake dataproducers Application
+###
+def create_fake_readout_app(
+    RU_DESCRIPTOR,
+    CLOCK_SPEED_HZ
+) -> App:
+    """
+    """
+    modules = []
+    queues = []
+
+    # _, _, fakedata_fragment_type, fakedata_time_tick, fakedata_frame_size = compute_data_types(RU_DESCRIPTOR.det_id, CLOCK_SPEED_HZ, RU_DESCRIPTOR.kind)
+
+    for stream in RU_DESCRIPTOR.streams:
+        _, _, fakedata_fragment_type, fakedata_time_tick, fakedata_frame_size = compute_data_types(stream)
+
+        modules += [DAQModule(name = f"fakedataprod_{stream.src_id}",
+                                plugin='FakeDataProd',
+                                conf = fdp.ConfParams(
+                                system_type = "Detector_Readout",
+                                source_id = stream.src_id,
+                                time_tick_diff = fakedata_time_tick,
+                                frame_size = fakedata_frame_size,
+                                response_delay = 0,
+                                fragment_type = fakedata_fragment_type,
+                                ))]
+
+    mgraph = ModuleGraph(modules, queues=queues)
+
+    for stream in RU_DESCRIPTOR.streams:
+        # Add fragment producers for fake data. This call is necessary to create the RequestReceiver instance, but we don't need the generated FragmentSender or its queues...
+        mgraph.add_fragment_producer(id = stream.src_id, subsystem = "Detector_Readout",
+                                        requests_in   = f"fakedataprod_{stream.src_id}.data_request_input_queue",
+                                        fragments_out = f"fakedataprod_{stream.src_id}.fragment_queue")
+        mgraph.add_endpoint(f"timesync_ru{RU_DESCRIPTOR.label}_{stream.src_id}", f"fakedataprod_{stream.src_id}.timesync_output",    "TimeSync",   Direction.OUT, is_pubsub=True, toposort=False)
+
+    # Create the application
+    readout_app = App(mgraph, host=RU_DESCRIPTOR.host_name)
+
+    # All done
+    return readout_app
+
+
 # Time to wait on pop()
 QUEUE_POP_WAIT_MS = 10 # This affects stop time, as each link will wait this long before stop
 
