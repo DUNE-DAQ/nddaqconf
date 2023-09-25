@@ -1,4 +1,4 @@
-// This is the configuration schema for daqconf_multiru_gen
+// This is the configuration schema for nddaqconf_gen
 //
 
 local moo = import "moo.jsonnet";
@@ -6,7 +6,7 @@ local moo = import "moo.jsonnet";
 local stypes = import "daqconf/types.jsonnet";
 local types = moo.oschema.hier(stypes).dunedaq.daqconf.types;
 
-local s = moo.oschema.schema("dunedaq.daqconf.readoutgen");
+local s = moo.oschema.schema("dunedaq.nddaqconf.readoutgen");
 local nc = moo.oschema.numeric_constraints;
 // A temporary schema construction context.
 local cs = {
