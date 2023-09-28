@@ -264,7 +264,7 @@ def cli(
         console.log("Loading dqm config generator")
         from daqconf.apps.dqm_gen import get_dqm_app
     console.log("Loading readout config generator")
-    from nddaqconf.apps.readout_gen import create_fake_readout_app, NDReadoutAppGenerator
+    from nddaqconf.apps.readout_gen import NDReadoutAppGenerator
     console.log("Loading trigger config generator")
     from daqconf.apps.trigger_gen import get_trigger_app
     console.log("Loading DFO config generator")
@@ -455,7 +455,7 @@ def cli(
                 )
 
         else:
-            the_system.apps[ru_name] = create_fake_readout_app(
+            the_system.apps[ru_name] = roapp_gen.create_fake_readout_app(
                 RU_DESCRIPTOR = ru_desc,
                 CLOCK_SPEED_HZ = detector.clock_speed_hz,
             )

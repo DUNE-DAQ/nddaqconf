@@ -29,81 +29,36 @@ from daqconf.apps.readout_gen import ReadoutAppGenerator
 from detdataformats import DetID
 
 
-## Compute the frament types from detector infos
-def compute_data_types(
-        stream_entry
-    ):
-    det_str = DetID.subdetector_to_string(DetID.Subdetector(stream_entry.geo_id.det_id))
-
-    if det_str == "NDLAr_TPC":
-        fe_type = "pacman"
-        fakedata_frag_type = "PACMAN"
-        queue_frag_type = "PACMANFrame"
-        fakedata_time_tick=None
-        fakedata_frame_size=None       
-    elif det_str == "NDLAr_PDS":
-        fe_type = "mpd"
-        fakedata_frag_type = "MPD"
-        queue_frag_type = "MPDFrame"
-        fakedata_time_tick=None
-        fakedata_frame_size=None       
-    else:
-        raise ValueError(f"No match for {det_str}, {stream_entry.kind}")
-
-
-    return fe_type, queue_frag_type, fakedata_frag_type, fakedata_time_tick, fakedata_frame_size
-
-
-###
-# Create Fake dataproducers Application
-###
-def create_fake_readout_app(
-    RU_DESCRIPTOR,
-    CLOCK_SPEED_HZ
-) -> App:
-    """
-    """
-    modules = []
-    queues = []
-
-    # _, _, fakedata_fragment_type, fakedata_time_tick, fakedata_frame_size = compute_data_types(RU_DESCRIPTOR.det_id, CLOCK_SPEED_HZ, RU_DESCRIPTOR.kind)
-
-    for stream in RU_DESCRIPTOR.streams:
-        _, _, fakedata_fragment_type, fakedata_time_tick, fakedata_frame_size = compute_data_types(stream)
-
-        modules += [DAQModule(name = f"fakedataprod_{stream.src_id}",
-                                plugin='FakeDataProd',
-                                conf = fdp.ConfParams(
-                                system_type = "Detector_Readout",
-                                source_id = stream.src_id,
-                                time_tick_diff = fakedata_time_tick,
-                                frame_size = fakedata_frame_size,
-                                response_delay = 0,
-                                fragment_type = fakedata_fragment_type,
-                                ))]
-
-    mgraph = ModuleGraph(modules, queues=queues)
-
-    for stream in RU_DESCRIPTOR.streams:
-        # Add fragment producers for fake data. This call is necessary to create the RequestReceiver instance, but we don't need the generated FragmentSender or its queues...
-        mgraph.add_fragment_producer(id = stream.src_id, subsystem = "Detector_Readout",
-                                        requests_in   = f"fakedataprod_{stream.src_id}.data_request_input_queue",
-                                        fragments_out = f"fakedataprod_{stream.src_id}.fragment_queue")
-        mgraph.add_endpoint(f"timesync_ru{RU_DESCRIPTOR.label}_{stream.src_id}", f"fakedataprod_{stream.src_id}.timesync_output",    "TimeSync",   Direction.OUT, is_pubsub=True, toposort=False)
-
-    # Create the application
-    readout_app = App(mgraph, host=RU_DESCRIPTOR.host_name)
-
-    # All done
-    return readout_app
-
-
 # Time to wait on pop()
 QUEUE_POP_WAIT_MS = 10 # This affects stop time, as each link will wait this long before stop
 
 class NDReadoutAppGenerator(ReadoutAppGenerator):
 
     dlh_plugin = "NDDataLinkHandler"
+
+    ## Compute the frament types from detector infos
+    def compute_data_types(
+            self,
+            stream_entry
+    ):
+        det_str = DetID.subdetector_to_string(DetID.Subdetector(stream_entry.geo_id.det_id))
+
+        if det_str == "NDLAr_TPC":
+            fe_type = "pacman"
+            fakedata_frag_type = "PACMAN"
+            queue_frag_type = "PACMANFrame"
+            fakedata_time_tick=None
+            fakedata_frame_size=None       
+        elif det_str == "NDLAr_PDS":
+            fe_type = "mpd"
+            fakedata_frag_type = "MPD"
+            queue_frag_type = "MPDFrame"
+            fakedata_time_tick=None
+            fakedata_frame_size=None       
+        else:
+            raise ValueError(f"No match for {det_str}, {stream_entry.kind}")
+
+        return fe_type, queue_frag_type, fakedata_frag_type, fakedata_time_tick, fakedata_frame_size
 
     def create_fake_cardreader(
         self,
@@ -144,7 +99,7 @@ class NDReadoutAppGenerator(ReadoutAppGenerator):
       
         queues = []
         for s in RU_DESCRIPTOR.streams:
-            FRONTEND_TYPE, QUEUE_FRAGMENT_TYPE, _, _, _ = compute_data_types(s)
+            FRONTEND_TYPE, QUEUE_FRAGMENT_TYPE, _, _, _ = self.compute_data_types(s)
             queues.append(
                 Queue(
                     f"fake_source.output_{s.src_id}",
@@ -164,7 +119,7 @@ class NDReadoutAppGenerator(ReadoutAppGenerator):
         Create a Pacman Cardeader 
         """
 
-        FRONTEND_TYPE, _, _, _, _ = compute_data_types(RU_DESCRIPTOR.streams[0])
+        FRONTEND_TYPE, _, _, _, _ = self.compute_data_types(RU_DESCRIPTOR.streams[0])
         reader_name = "pacman_reader" 
         if FRONTEND_TYPE == 'pacman':
             reader_name = "pacman_source"
@@ -186,7 +141,7 @@ class NDReadoutAppGenerator(ReadoutAppGenerator):
         # Queues
         queues = []
         for s in RU_DESCRIPTOR.streams:
-            FRONTEND_TYPE, QUEUE_FRAGMENT_TYPE, _, _, _ = compute_data_types(s)
+            FRONTEND_TYPE, QUEUE_FRAGMENT_TYPE, _, _, _ = self.compute_data_types(s)
             queues.append(
                 Queue(
                     f"{reader_name}.output_{s.src_id}",
