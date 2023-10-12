@@ -608,16 +608,11 @@ def cli(
         the_system.export(debug_dir / "system_no_frag_prod_connection.dot")
     connect_all_fragment_producers(the_system, verbose=debug)
 
-    set_mlt_links(the_system, "trigger", verbose=debug)
+    set_mlt_links(the_system, tp_infos, "trigger", verbose=debug)
 
-    mlt_links=the_system.apps["trigger"].modulegraph.get_module("mlt").conf.links
+    mlt_mandatory_links=the_system.apps["trigger"].modulegraph.get_module("mlt").conf.mandatory_links
     if debug:
-        console.log(f"After set_mlt_links, mlt_links is {mlt_links}")
-
-
-    mlt_links=the_system.apps["trigger"].modulegraph.get_module("mlt").conf.links
-    if debug:
-        console.log(f"After remove_mlt_links, mlt_links is {mlt_links}")
+        console.log(f"After set_mlt_links, mlt_mandatory_links is {mlt_mandatory_links}")
     # END HACK
 
     if debug:
