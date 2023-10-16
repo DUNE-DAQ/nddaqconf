@@ -31,9 +31,6 @@ local triggergen = moo.oschema.hier(strigger).dunedaq.daqconf.triggergen;
 local sdataflow = import "daqconf/dataflowgen.jsonnet";
 local dataflowgen = moo.oschema.hier(sdataflow).dunedaq.daqconf.dataflowgen;
 
-local sdqm = import "daqconf/dqmgen.jsonnet";
-local dqmgen = moo.oschema.hier(sdqm).dunedaq.daqconf.dqmgen;
-
 local s = moo.oschema.schema("dunedaq.nddaqconf.confgen");
 local nc = moo.oschema.numeric_constraints;
 // A temporary schema construction context.
@@ -45,7 +42,6 @@ local cs = {
     s.field('daq_common',  daqcommongen.daq_common, default=daqcommongen.daq_common,   doc='DAQ common parameters'),
     s.field('boot',        bootgen.boot,    default=bootgen.boot,      doc='Boot parameters'),
     s.field('dataflow',    dataflowgen.dataflow,   default=dataflowgen.dataflow,     doc='Dataflow paramaters'),
-    s.field('dqm',         dqmgen.dqm,        default=dqmgen.dqm,          doc='DQM parameters'),
     s.field('hsi',         hsigen.hsi,        default=hsigen.hsi,          doc='HSI parameters'),
     s.field('readout',     readoutgen.readout,    default=readoutgen.readout,      doc='Readout parameters'),
     s.field('timing',      timinggen.timing,     default=timinggen.timing,       doc='Timing parameters'),
@@ -55,4 +51,4 @@ local cs = {
 };
 
 // Output a topologically sorted array.
-stypes + sboot + sdetector + sdaqcommon + stiming + shsi + sreadout + strigger + sdataflow + sdqm + moo.oschema.sort_select(cs)
+stypes + sboot + sdetector + sdaqcommon + stiming + shsi + sreadout + strigger + sdataflow + moo.oschema.sort_select(cs)
