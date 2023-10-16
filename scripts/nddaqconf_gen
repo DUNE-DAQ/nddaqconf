@@ -39,7 +39,6 @@ def expand_conf(config_data, debug=False):
     import dunedaq.daqconf.hsigen as hsigen
     import dunedaq.daqconf.triggergen as triggergen
     import dunedaq.daqconf.dataflowgen as dataflowgen
-    import dunedaq.daqconf.dqmgen as dqmgen
     import dunedaq.nddaqconf.readoutgen as readoutgen
 
     ## Hack, we shouldn't need to do that, in the future it should be, boot = config_data.boot
@@ -67,9 +66,6 @@ def expand_conf(config_data, debug=False):
     dataflow = dataflowgen.dataflow(**config_data.dataflow)
     if debug: console.log(f"dataflow configuration object: {dataflow.pod()}")
 
-    dqm = dqmgen.dqm(**config_data.dqm)
-    if debug: console.log(f"dqm configuration object: {dqm.pod()}")
-
     return (
         boot,
         detector,
@@ -79,10 +75,9 @@ def expand_conf(config_data, debug=False):
         readout,
         trigger,
         dataflow,
-        dqm,
     )
 
-def validate_conf(boot, readout, dataflow, timing, hsi, dqm):
+def validate_conf(boot, readout, dataflow, timing, hsi):
     """Validate the consistency of confgen parameters
 
     Args:
@@ -91,7 +86,6 @@ def validate_conf(boot, readout, dataflow, timing, hsi, dqm):
         dataflow (_type_): _description_
         timing (_type_): _description_
         hsi (_type_): _description_
-        dqm (_type_): _description_
 
     Raises:
         Exception: _description_
@@ -104,9 +98,6 @@ def validate_conf(boot, readout, dataflow, timing, hsi, dqm):
     """
     if readout.enable_tpg and readout.use_fake_data_producers:
         raise Exception("Fake data producers don't support software tpg")
-
-    if readout.use_fake_data_producers and dqm.enable_dqm:
-        raise Exception("DQM can't be used with fake data producers")
 
     if dataflow.enable_tpset_writing and not readout.enable_tpg:
         raise Exception("TP writing can only be used when either software or firmware TPG is enabled")
@@ -166,7 +157,6 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 @click.option('-m', '--detector-readout-map-file', default=None, help="File containing detector detector-readout map for configuration to run")
 @click.option('-s', '--data-rate-slowdown-factor', default=0, help="Scale factor for readout internal clock to generate less data")
 @click.option('--file-label', default=None, help="File - used for raw data filename prefix")
-@click.option('--enable-dqm', default=False, is_flag=True, help="Enable generation of DQM apps")
 @click.option('-a', '--check-args-and-exit', default=False, is_flag=True, help="Check input arguments and quit")
 @click.option('-n', '--dry-run', default=False, is_flag=True, help="Dry run, do not generate output files")
 @click.option('-f', '--force', default=False, is_flag=True, help="Force configuration generation - delete existing target directory if exists")
@@ -178,7 +168,6 @@ def cli(
         base_command_port,
         detector_readout_map_file,
         data_rate_slowdown_factor,
-        enable_dqm,
         file_label,
         check_args_and_exit,
         dry_run,
@@ -221,7 +210,6 @@ def cli(
         readout,
         trigger,
         dataflow,
-        dqm,
     ) = expand_conf(config_data, debug)
 
     #
@@ -246,23 +234,15 @@ def cli(
         daq_common.data_rate_slowdown_factor = data_rate_slowdown_factor
         console.log(f"daq_common.data_rate_slowdown_factor set to {daq_common.data_rate_slowdown_factor}")
 
-    dqm.enable_dqm |= enable_dqm
-
-    if dqm.impl == 'pocket':
-        dqm.kafka_address = boot.pocket_url + ":30092"
-    
     file_label = file_label if file_label is not None else detector.op_env
 
     #--------------------------------------------------------------------------
     # Validate configuration
     #--------------------------------------------------------------------------
-    validate_conf(boot, readout, dataflow, timing, hsi, dqm)
+    validate_conf(boot, readout, dataflow, timing, hsi)
 
     console.log("Loading dataflow config generator")
     from daqconf.apps.dataflow_gen import get_dataflow_app
-    if dqm.enable_dqm:
-        console.log("Loading dqm config generator")
-        from daqconf.apps.dqm_gen import get_dqm_app
     console.log("Loading readout config generator")
     from nddaqconf.apps.readout_gen import create_fake_readout_app, NDReadoutAppGenerator
     console.log("Loading trigger config generator")
@@ -308,7 +288,7 @@ def cli(
     #--------------------------------------------------------------------------
     # Generation starts here
     #--------------------------------------------------------------------------
-    console.log(f"Generating configs for hosts trigger={trigger.host_trigger} DFO={dataflow.host_dfo} dataflow={host_df} timing_hsi={hsi.host_timing_hsi} fake_hsi={hsi.host_fake_hsi} dqm={dqm.host_dqm}")
+    console.log(f"Generating configs for hosts trigger={trigger.host_trigger} DFO={dataflow.host_dfo} dataflow={host_df} timing_hsi={hsi.host_timing_hsi} fake_hsi={hsi.host_fake_hsi}")
 
     the_system = System()
 
@@ -434,9 +414,7 @@ def cli(
         DEBUG=debug)
 
 
-    trb_dqm_sourceid_offset = sourceid_broker.get_next_source_id("TRBuilder")
     ru_app_names=[]
-    dqm_app_names = []
 
     #--------------------------------------------------------------------------
     # Readout generation
@@ -465,51 +443,11 @@ def cli(
         if debug:
             console.log(f"{ru_name} app: {the_system.apps[ru_name]}")
 
-        #--------------------------------------------------------------------------
-        # DQM frontend applications
-        #--------------------------------------------------------------------------
-        if dqm.enable_dqm:
-            dqm_name = "dqm" + ru_name
-            dqm_app_names.append(dqm_name)
-            dqm_links = [ s.src_id for s in ru_desc.streams ]
-
-            # 07-Mar-2023, KAB: I don't know why {ru_name} in this code *doesn't* have an
-            # underscore in it, and the {RUIDX} variable inside get_readout_app *does* have
-            # an underscore, but that idiosyncrasy means that we can't just give the ru_name
-            # to get_dqm_app for it to use when subscribing to TimeSync messages. So, we'll
-            # create a dedicated variable here *with* the underscore.
-            # ru_name_with_underscore = f"ru{host}_{ru_id.iface}"
-
-            the_system.apps[dqm_name] = get_dqm_app(
-                DQM_IMPL=dqm.impl,
-                DATA_RATE_SLOWDOWN_FACTOR=daq_common.data_rate_slowdown_factor,
-                CLOCK_SPEED_HZ=detector.clock_speed_hz,
-                MAX_NUM_FRAMES=dqm.max_num_frames,
-                DQMIDX = ru_i,
-                KAFKA_ADDRESS=dqm.kafka_address,
-                KAFKA_TOPIC=dqm.kafka_topic,
-                CMAP=dqm.cmap,
-                RAW_PARAMS=dqm.raw_params,
-                RMS_PARAMS=dqm.rms_params,
-                STD_PARAMS=dqm.std_params,
-                FOURIER_CHANNEL_PARAMS=dqm.fourier_channel_params,
-                FOURIER_PLANE_PARAMS=dqm.fourier_plane_params,
-                LINKS=dqm_links,
-                RU_APPNAME=ru_name,
-                TRB_DQM_SOURCEID_OFFSET=trb_dqm_sourceid_offset,
-                HOST=dqm.host_dqm[ru_i % len(dqm.host_dqm)],
-                RU_STREAMS=ru_desc.streams,
-                DEBUG=debug
-            )
-
-            if debug: console.log(f"{dqm_name} app: {the_system.apps[dqm_name]}")
-
 
 
     #--------------------------------------------------------------------------
     # Dataflow applications generatioo
     #--------------------------------------------------------------------------
-    dqm_df_app_names = []
     idx = 0
 
     for app_name,df_config in appconfig_df.items():
@@ -523,40 +461,11 @@ def cli(
             FILE_LABEL = file_label,
             MAX_EXPECTED_TR_SEQUENCES = max_expected_tr_sequences,
             TRB_TIMEOUT = trigger_record_building_timeout,
-            HAS_DQM=dqm.enable_dqm,
             SRC_GEO_ID_MAP=dro_map.get_src_geo_map(),
             DEBUG=debug
         )
 
 
-        if dqm.enable_dqm:
-            dqm_name = f"dqmdf{dfidx}"
-            dqm_df_app_names.append(dqm_name)
-            dqm_links = [ s.src_id for s in ru_desc.streams ]
-            the_system.apps[dqm_name] = get_dqm_app(
-                DQM_IMPL=dqm.impl,
-                DATA_RATE_SLOWDOWN_FACTOR = daq_common.data_rate_slowdown_factor,
-                CLOCK_SPEED_HZ = detector.clock_speed_hz,
-                MAX_NUM_FRAMES=dqm.max_num_frames,
-                DQMIDX = dfidx,
-                KAFKA_ADDRESS=dqm.kafka_address,
-                KAFKA_TOPIC=dqm.kafka_topic,
-                CMAP=dqm.cmap,
-                RAW_PARAMS=[0, 0],
-                RMS_PARAMS=[0, 0],
-                STD_PARAMS=[0, 0],
-                FOURIER_CHANNEL_PARAMS=[0, 0],
-                FOURIER_PLANE_PARAMS=[0, 0],
-                LINKS=dqm_links,
-                HOST=dqm.host_dqm[idx%len(dqm.host_dqm)],
-                MODE='df',
-                DF_RATE=dqm.df_rate * len(host_df),
-                DF_ALGS=dqm.df_algs,
-                DF_TIME_WINDOW=trigger.trigger_window_before_ticks + trigger.trigger_window_after_ticks,
-                RU_STREAMS=ru_desc.streams, # This is coming from the readout loop
-                DEBUG=debug)
-
-            if debug: console.log(f"{dqm_name} app: {the_system.apps[dqm_name]}")
         idx += 1
 
     #--------------------------------------------------------------------------
@@ -646,14 +555,6 @@ def cli(
         if dataflow.enable_tpset_writing:
             forced_deps.append(['tpwriter', ru_name])
 
-    if dqm.enable_dqm:
-
-        for dqm_name in dqm_app_names:
-            forced_deps.append([dqm_name, 'dfo'])
-
-        for dqm_name in dqm_df_app_names:
-            forced_deps.append([dqm_name, 'dfo'])
-
     forced_deps.append(['trigger','hsi'])
 
     def control_to_data_network(control_hostname:str) -> str:
@@ -723,7 +624,6 @@ def cli(
                 detector = detector,
                 daq_common = daq_common,
                 dataflow = dataflow,
-                dqm = dqm,
                 hsi = hsi,
                 readout = readout,
                 timing = timing,
