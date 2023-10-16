@@ -68,6 +68,8 @@ local cs = {
     // DLH
     s.field( "emulator_mode", types.flag, default=false, doc="If active, timestamps of data frames are overwritten when processed by the readout. This is necessary if the felix card does not set correct timestamps. Former -e"),
     s.field( "thread_pinning_file", types.path, default="", doc="A thread pinning configuration file that gets executed after conf."),
+    s.field( "source_queue_timeout_ms", types.count, default=0, doc="The source queue timeout that will be used in the datalink handle when polling source queues"),
+    s.field( "source_queue_sleep_us", types.count, default=500, doc="The source queue seep that will be used in the datalink handle when polling source queues."),
     // s.field( "data_rate_slowdown_factor",types.count, default=1, doc="Factor by which to suppress data generation. Former -s"),
     s.field( "latency_buffer_size", types.count, default=499968, doc="Size of the latency buffers (in number of elements)"),
     s.field( "fragment_send_timeout_ms", types.count, default=10, doc="The send timeout that will be used in the readout modules when sending fragments downstream (i.e. to the TRB)."),

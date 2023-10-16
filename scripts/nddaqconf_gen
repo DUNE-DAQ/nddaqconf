@@ -419,6 +419,7 @@ def cli(
         daq_common=daq_common,
         tp_infos=tp_infos,
         trigger_data_request_timeout=trigger_data_request_timeout,
+        use_hsi_input=(hsi.use_fake_hsi or hsi.use_timing_hsi),
         DEBUG=debug)
 
     #--------------------------------------------------------------------------
