@@ -611,8 +611,10 @@ def cli(
     set_mlt_links(the_system, tp_infos, "trigger", verbose=debug)
 
     mlt_mandatory_links=the_system.apps["trigger"].modulegraph.get_module("mlt").conf.mandatory_links
+    mlt_groups_links=the_system.apps["trigger"].modulegraph.get_module("mlt").conf.groups_links
     if debug:
-        console.log(f"After set_mlt_links, mlt_mandatory_links is {mlt_mandatory_links}")
+        console.log(f"After set_mlt_links, mlt_mandatory_links are {mlt_mandatory_links}")
+        console.log(f"Groups links are {mlt_groups_links}")
     # END HACK
 
     if debug:
