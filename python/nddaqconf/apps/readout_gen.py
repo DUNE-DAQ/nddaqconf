@@ -224,3 +224,10 @@ class NDReadoutAppGenerator(ReadoutAppGenerator):
                 raise RuntimeError("Card reader could not be created.")
 
         return cr_mods, cr_queues
+
+    def add_volumes_resources(self, readout_app, RU_DESCRIPTOR):
+        # Can be used to add additoinal resources to be mounted on the container
+        # not used for ND 
+        return
+
+
