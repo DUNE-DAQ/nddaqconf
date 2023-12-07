@@ -303,10 +303,6 @@ def cli(
     if readout.detector_readout_map_file:
         dro_map.load(readout.detector_readout_map_file)
 
-    send_partial_fragments = False
-    if readout.send_partial_fragments:
-        send_partial_fragments = readout.send_partial_fragments
-        
     ru_descs = dro_map.get_ru_descriptors()
 
     # tp_mode = get_tpg_mode(readout.enable_firmware_tpg,readout.enable_tpg)
@@ -434,8 +430,7 @@ def cli(
                 RU_DESCRIPTOR=ru_desc, 
                 SOURCEID_BROKER=sourceid_broker, 
                 data_file_map=data_file_map,
-                data_timeout_requests=readout_data_request_timeout,
-                send_partial_fragments=send_partial_fragments
+                data_timeout_requests=readout_data_request_timeout
                 )
 
         else:
