@@ -77,6 +77,7 @@ local cs = {
     s.field( "tpg_threshold", types.count, default=120, doc="Select TPG threshold"),
     s.field( "tpg_algorithm", types.string, default="SimpleThreshold", doc="Select TPG algorithm (SimpleThreshold, AbsRS)"),
     s.field( "tpg_channel_mask", self.id_list, default=[], doc="List of offline channels to be masked out from the TPHandler"),
+    s.field( "tpset_min_latency_ticks", types.uint8, 3125000, doc="Latency introduced to allow for TPs to arrive and be reordered, default is 50 ms"),
     s.field( "enable_raw_recording", types.flag, default=false, doc="Add queues and modules necessary for the record command"),
     s.field( "raw_recording_output_dir", types.path, default='.', doc="Output directory where recorded data is written to. Data for each link is written to a separate file"),
     s.field( "send_partial_fragments", types.flag, default=false, doc="Whether to send a partial fragment if one is available") 
